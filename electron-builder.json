@@ -23,8 +23,8 @@
   "executableName": "Souvlatzidiko-Unlocker",
   "extraResources": [
     {
-      "from": "resources/steam_x256.ico",
-      "to": "steam_x256.ico"
+      "from": "resources/all_steam_x256.ico",
+      "to": "all_steam_x256.ico"
     }
   ],
   "win": {
@@ -34,17 +34,16 @@
         "arch": ["x64"]
       }
     ],
-    "icon": "resources/steam_x256.ico",
-    "requestedExecutionLevel": "asInvoker",
-    "signAndEditExecutable": false
+    "icon": "resources/all_steam_x256.ico",
+    "requestedExecutionLevel": "asInvoker"
   },
   "nsis": {
     "oneClick": true,
     "perMachine": false,
     "allowToChangeInstallationDirectory": false,
-    "installerIcon": "resources/steam_x256.ico",
-    "uninstallerIcon": "resources/steam_x256.ico",
-    "installerHeaderIcon": "resources/steam_x256.ico",
+    "installerIcon": "resources/all_steam_x256.ico",
+    "uninstallerIcon": "resources/all_steam_x256.ico",
+    "installerHeaderIcon": "resources/all_steam_x256.ico",
     "createDesktopShortcut": true,
     "createStartMenuShortcut": true,
     "shortcutName": "Souvlatzidiko-Unlocker",

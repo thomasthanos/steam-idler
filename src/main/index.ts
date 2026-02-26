@@ -43,8 +43,7 @@ if (!gotLock) {
 // ─── Helpers ──────────────────────────────────────────────────────────────
 function getIconPath(size: '256' | '32' | 'png' = '256'): string {
   const filename = size === 'png' ? 'steam.png'
-    : size === '32' ? 'steam_x32.ico'
-    : 'steam_x256.ico'
+    : 'all_steam_x256.ico'
 
   const candidates = [
     path.join(process.resourcesPath ?? '', filename),

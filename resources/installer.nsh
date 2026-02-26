@@ -68,7 +68,7 @@ AutoCloseWindow true
   ; AppUserModelID — must match app.setAppUserModelId() in main process
   ; This is what makes Windows group the taskbar correctly and show the right icon
   WriteRegStr HKCU "Software\Classes\AppUserModelId\com.ThomasThanos.SouvlatzidikoUnlocker" "DisplayName" "Souvlatzidiko-Unlocker"
-  WriteRegStr HKCU "Software\Classes\AppUserModelId\com.ThomasThanos.SouvlatzidikoUnlocker" "IconUri" "$INSTDIR\resources\steam_x256.ico"
+  WriteRegStr HKCU "Software\Classes\AppUserModelId\com.ThomasThanos.SouvlatzidikoUnlocker" "IconUri" "$INSTDIR\resources\all_steam_x256.ico"
 !macroend
 
 ; ============================================================================
