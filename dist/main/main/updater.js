@@ -86,7 +86,7 @@ function broadcast(state) {
     }
 }
 // ─── performStartupUpdateCheck ────────────────────────────────────────────────
-function performStartupUpdateCheck(onEvent) {
+function performStartupUpdateCheck(onEvent, preload) {
     return new Promise((resolve) => {
         let finished = false;
         let timeoutHandle = null;
@@ -110,11 +110,19 @@ function performStartupUpdateCheck(onEvent) {
             if (timeoutHandle)
                 clearTimeout(timeoutHandle);
             onEvent({ type: 'status', text: `Downloading v${info.version}…` });
+            // Manually trigger download during splash (autoDownload is disabled globally
+            // so that background checks after launch don't auto-download)
             electron_updater_1.autoUpdater.downloadUpdate().catch(() => done());
         };
         const onNotAvailable = () => {
             onEvent({ type: 'status', text: 'Up to date.' });
-            setTimeout(done, 600);
+            if (preload) {
+                // Use the splash window time to preload data in the background
+                preload(onEvent).catch(() => { }).finally(() => done());
+            }
+            else {
+                setTimeout(done, 600);
+            }
         };
         const onProgress = (p) => {
             const pct = Math.round(p.percent);

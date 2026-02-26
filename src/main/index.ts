@@ -3,7 +3,7 @@ import { TRAY_ICONS } from './trayIcons'
 import * as path from 'path'
 import * as fs from 'fs'
 import { setupIpcHandlers } from './ipc/handlers'
-import { performStartupUpdateCheck, setupUpdater, triggerBackgroundCheck, SplashEvent } from './updater'
+import { performStartupUpdateCheck, setupUpdater, triggerBackgroundCheck, SplashEvent, PreloadFn } from './updater'
 import { SteamClient } from './steam/client'
 import { IdleManager } from './steam/idleManager'
 import Store from 'electron-store'
@@ -119,8 +119,36 @@ async function runSplashFlow(onReady: () => void): Promise<void> {
     }
   }
 
+  // Build the preload function — warms Steam + user + games cache
+  // so the main window opens with data instantly ready
+  const preloadFn: PreloadFn = async (emit) => {
+    emit({ type: 'status', text: 'Loading Steam…' })
+    emit({ type: 'progress', percent: 20 })
+
+    try {
+      const isRunning = await steamClient.isSteamRunning().catch(() => false)
+      emit({ type: 'progress', percent: 40 })
+
+      if (isRunning) {
+        emit({ type: 'status', text: 'Loading user info…' })
+        await steamClient.getUserInfo().catch(() => null)
+        emit({ type: 'progress', percent: 65 })
+
+        emit({ type: 'status', text: 'Loading games library…' })
+        await steamClient.getOwnedGames().catch(() => null)
+        emit({ type: 'progress', percent: 90 })
+      } else {
+        emit({ type: 'progress', percent: 90 })
+      }
+    } catch { /* silent — splash will just close */ }
+
+    emit({ type: 'progress', percent: 100 })
+    emit({ type: 'status', text: 'Ready!' })
+    await new Promise(r => setTimeout(r, 300))
+  }
+
   // Run update check — this resolves when the flow is complete
-  await performStartupUpdateCheck(onSplashEvent)
+  await performStartupUpdateCheck(onSplashEvent, preloadFn)
 
   // Transition: show status "Launching…", create main window, then close splash
   call('_setStatus', 'Launching…')

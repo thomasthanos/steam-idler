@@ -26,7 +26,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [isLoadingGames, setIsLoadingGames] = useState(false)
   const [gamesFetched, setGamesFetched] = useState(false)
 
-  const refreshUser = async () => {
+  const refreshUser = useCallback(async () => {
     setIsLoadingUser(true)
     try {
       const statusRes = await window.steam.checkSteamRunning()
@@ -40,7 +40,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsLoadingUser(false)
     }
-  }
+  }, [])
 
   const fetchGames = useCallback(async (force = false) => {
     if (gamesFetched && !force) return
@@ -82,14 +82,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
-    window.steam.getSettings().then((res) => {
-      if (res.success && res.data) setSettings(res.data)
-    })
-
-    // Startup: check Steam + load user + auto-fetch games in background
+    // Fire all startup requests in parallel — main process has preloaded
+    // Steam status, user info and games cache during the splash screen,
+    // so every IPC call here returns almost instantly.
     const init = async () => {
-      await refreshUser()
-      // Kick off game fetch in background (shows cached data instantly if available)
+      const [settingsRes] = await Promise.all([
+        window.steam.getSettings(),
+        refreshUser(),
+      ])
+      if (settingsRes.success && settingsRes.data) setSettings(settingsRes.data)
+      // Games were preloaded into cache — fetchGames() returns from cache immediately
       fetchGames()
     }
     init()

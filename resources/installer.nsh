@@ -38,8 +38,11 @@ AutoCloseWindow true
 
   process_exited:
 
-  ; Remove old installation registry keys
-  ReadRegStr $R0 HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\${UNINSTALL_APP_KEY}" "UninstallString"
+  ; Remove old installation registry keys (check both HKLM and HKCU for upgrades)
+  ReadRegStr $R0 HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${UNINSTALL_APP_KEY}" "UninstallString"
+  ${If} $R0 == ""
+    ReadRegStr $R0 HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\${UNINSTALL_APP_KEY}" "UninstallString"
+  ${EndIf}
   StrCmp $R0 "" done_uninstall
 
   ; Strip quotes
@@ -63,10 +66,10 @@ AutoCloseWindow true
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\${UNINSTALL_APP_KEY}" "DisplayVersion" "${VERSION}"
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\${UNINSTALL_APP_KEY}" "Publisher" "ThomasThanos"
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\${UNINSTALL_APP_KEY}" "DisplayIcon" "$INSTDIR\Souvlatzidiko-Unlocker.exe"
+  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\${UNINSTALL_APP_KEY}" "InstallLocation" "$INSTDIR"
   WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\${UNINSTALL_APP_KEY}" "EstimatedSize" 0x0000C800
 
   ; AppUserModelID — must match app.setAppUserModelId() in main process
-  ; This is what makes Windows group the taskbar correctly and show the right icon
   WriteRegStr HKCU "Software\Classes\AppUserModelId\com.ThomasThanos.SouvlatzidikoUnlocker" "DisplayName" "Souvlatzidiko-Unlocker"
   WriteRegStr HKCU "Software\Classes\AppUserModelId\com.ThomasThanos.SouvlatzidikoUnlocker" "IconUri" "$INSTDIR\resources\all_steam_x256.ico"
 !macroend
@@ -81,6 +84,10 @@ AutoCloseWindow true
   ${ifNot} ${isUpdated}
     ${If} ${FileExists} "$LOCALAPPDATA\ThomasThanos\Souvlatzidiko-Unlocker\*.*"
       RMDir /r "$LOCALAPPDATA\ThomasThanos\Souvlatzidiko-Unlocker"
+    ${EndIf}
+    ; Clean up parent folder if empty
+    ${If} ${FileExists} "$LOCALAPPDATA\ThomasThanos"
+      RMDir "$LOCALAPPDATA\ThomasThanos"
     ${EndIf}
   ${endIf}
 !macroend

@@ -54,9 +54,13 @@ function broadcast(state: UpdaterState) {
   }
 }
 
+// ─── PreloadFn — optional warm-up that runs when no update is found ────────────
+export type PreloadFn = (onEvent: (evt: SplashEvent) => void) => Promise<void>
+
 // ─── performStartupUpdateCheck ────────────────────────────────────────────────
 export function performStartupUpdateCheck(
-  onEvent: (evt: SplashEvent) => void
+  onEvent: (evt: SplashEvent) => void,
+  preload?: PreloadFn
 ): Promise<void> {
   return new Promise((resolve) => {
     let finished = false
@@ -81,12 +85,19 @@ export function performStartupUpdateCheck(
     const onAvailable = (info: UpdateInfo) => {
       if (timeoutHandle) clearTimeout(timeoutHandle)
       onEvent({ type: 'status', text: `Downloading v${info.version}…` })
+      // Manually trigger download during splash (autoDownload is disabled globally
+      // so that background checks after launch don't auto-download)
       autoUpdater.downloadUpdate().catch(() => done())
     }
 
     const onNotAvailable = () => {
       onEvent({ type: 'status', text: 'Up to date.' })
-      setTimeout(done, 600)
+      if (preload) {
+        // Use the splash window time to preload data in the background
+        preload(onEvent).catch(() => {}).finally(() => done())
+      } else {
+        setTimeout(done, 600)
+      }
     }
 
     const onProgress = (p: ProgressInfo) => {
