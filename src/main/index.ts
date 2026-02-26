@@ -12,7 +12,7 @@ import { AppSettings, DEFAULT_SETTINGS } from '../shared/types'
 // ─── Set app identity FIRST — must be before any new Store() call ─────────────
 app.setName('Souvlatzidiko-Unlocker')
 if (process.platform === 'win32') {
-  app.setAppUserModelId('com.steamachievementmanager.app')
+  app.setAppUserModelId('com.ThomasThanos.SouvlatzidikoUnlocker')
 }
 app.setPath('userData', path.join(app.getPath('appData'), 'ThomasThanos', 'Souvlatzidiko-Unlocker'))
 
@@ -47,9 +47,9 @@ function getIconPath(size: '256' | '32' | 'png' = '256'): string {
     : 'steam_x256.ico'
 
   const candidates = [
+    path.join(process.resourcesPath ?? '', filename),
     path.join(__dirname, '../../../resources', filename),
     path.join(app.getAppPath(), 'resources', filename),
-    path.join(process.resourcesPath ?? '', filename),
   ]
   for (const p of candidates) {
     try { if (fs.existsSync(p)) return p } catch { /* ok */ }

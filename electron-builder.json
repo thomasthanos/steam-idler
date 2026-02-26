@@ -17,8 +17,16 @@
   "publish": {
     "provider": "github",
     "owner": "ThomasThanos",
-    "repo": "steam-idler"
+    "repo": "steam-idler",
+    "releaseType": "release"
   },
+  "executableName": "Souvlatzidiko-Unlocker",
+  "extraResources": [
+    {
+      "from": "resources/steam_x256.ico",
+      "to": "steam_x256.ico"
+    }
+  ],
   "win": {
     "target": [
       {
@@ -40,7 +48,8 @@
     "createDesktopShortcut": true,
     "createStartMenuShortcut": true,
     "shortcutName": "Souvlatzidiko-Unlocker",
-    "include": "resources/installer.nsh"
+    "include": "resources/installer.nsh",
+    "warningsAsErrors": false
   },
   "mac": {
     "target": ["dmg"],

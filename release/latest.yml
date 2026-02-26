@@ -1,8 +1,8 @@
-version: 1.0.0
+version: 1.0.3
 files:
-  - url: Souvlatzidiko-Unlocker-Setup-1.0.0.exe
-    sha512: WXCeT3cUIPMyPo7QNlraSidJBUQ80NUKfvDkQdBCn5f4aocx1kxpROhml+XrUa0Vb018HaLGfjcztI1CtJ0pFw==
-    size: 80186060
-path: Souvlatzidiko-Unlocker-Setup-1.0.0.exe
-sha512: WXCeT3cUIPMyPo7QNlraSidJBUQ80NUKfvDkQdBCn5f4aocx1kxpROhml+XrUa0Vb018HaLGfjcztI1CtJ0pFw==
-releaseDate: '2026-02-26T06:28:15.514Z'
+  - url: Souvlatzidiko-Unlocker-Setup-1.0.3.exe
+    sha512: zGjVs/vjZFzowlnV3JLyE2Tpnw5VduL9s4fH7USQcqgg/vCuXzwtsYaZNZcEu52rh8PL+p1Z+rWDH05j5tDNcA==
+    size: 81284365
+path: Souvlatzidiko-Unlocker-Setup-1.0.3.exe
+sha512: zGjVs/vjZFzowlnV3JLyE2Tpnw5VduL9s4fH7USQcqgg/vCuXzwtsYaZNZcEu52rh8PL+p1Z+rWDH05j5tDNcA==
+releaseDate: '2026-02-26T08:22:32.812Z'

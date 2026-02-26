@@ -50,7 +50,7 @@ const types_1 = require("../shared/types");
 // ─── Set app identity FIRST — must be before any new Store() call ─────────────
 electron_1.app.setName('Souvlatzidiko-Unlocker');
 if (process.platform === 'win32') {
-    electron_1.app.setAppUserModelId('com.steamachievementmanager.app');
+    electron_1.app.setAppUserModelId('com.ThomasThanos.SouvlatzidikoUnlocker');
 }
 electron_1.app.setPath('userData', path.join(electron_1.app.getPath('appData'), 'ThomasThanos', 'Souvlatzidiko-Unlocker'));
 let mainWindow = null;
@@ -81,9 +81,9 @@ function getIconPath(size = '256') {
         : size === '32' ? 'steam_x32.ico'
             : 'steam_x256.ico';
     const candidates = [
+        path.join(process.resourcesPath ?? '', filename),
         path.join(__dirname, '../../../resources', filename),
         path.join(electron_1.app.getAppPath(), 'resources', filename),
-        path.join(process.resourcesPath ?? '', filename),
     ];
     for (const p of candidates) {
         try {
