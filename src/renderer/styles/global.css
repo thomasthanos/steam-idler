@@ -1,0 +1,253 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500;1,400&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── CSS Variables (dark default – deep black, readable) ──────────────── */
+:root {
+  --bg:        #09090b;
+  --surface:   #0f0f12;
+  --panel:     #141418;
+  --card:      #18181d;
+  --border:    #27272f;
+  --borderhov: #3f3f52;
+  --text:      #e4e4ef;
+  --sub:       #a0a0b8;
+  --muted:     #5a5a78;
+  --accent:    #3b82f6;
+  --accenthov: #60a5fa;
+  --green:     #22c55e;
+  --red:       #ef4444;
+  --purple:    #7c3aed;
+
+  --skeleton-a: #141418;
+  --skeleton-b: #27272f;
+
+  /* Light-safe hover overlays */
+  --hover-overlay: rgba(255,255,255,0.05);
+  --btn-ghost-hover: rgba(255,255,255,0.07);
+}
+
+/* ── Light theme overrides ─────────────────────────────────────────────── */
+.light {
+  --bg:        #f1f5f9;
+  --surface:   #ffffff;
+  --panel:     #f8fafc;
+  --card:      #ffffff;
+  --border:    #e2e8f0;
+  --borderhov: #cbd5e1;
+  --text:      #0f172a;
+  --sub:       #475569;
+  --muted:     #94a3b8;
+  --accent:    #2563eb;
+  --accenthov: #1d4ed8;
+  --green:     #16a34a;
+  --red:       #dc2626;
+  --purple:    #7c3aed;
+
+  --skeleton-a: #e2e8f0;
+  --skeleton-b: #cbd5e1;
+
+  --hover-overlay: rgba(0,0,0,0.04);
+  --btn-ghost-hover: rgba(0,0,0,0.06);
+}
+
+@layer base {
+  * { box-sizing: border-box; }
+
+  html, body, #root { height: 100%; overflow: hidden; }
+
+  body {
+    -webkit-app-region: no-drag;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Outfit', system-ui, sans-serif;
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::-webkit-scrollbar       { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--borderhov); }
+}
+
+@layer components {
+  /* ── Buttons ── */
+  .btn {
+    @apply inline-flex items-center gap-2 px-4 py-2 rounded-xl font-medium text-sm
+           transition-all duration-150 active:scale-[0.97]
+           disabled:opacity-40 disabled:cursor-not-allowed;
+  }
+  .btn-primary {
+    @apply btn;
+    background: var(--accent);
+    color: #fff;
+  }
+  .btn-primary:hover { background: var(--accenthov); }
+
+  .btn-ghost {
+    @apply btn border;
+    background: transparent;
+    color: var(--sub);
+    border-color: var(--border);
+  }
+  .btn-ghost:hover {
+    background: var(--btn-ghost-hover);
+    color: var(--text);
+    border-color: var(--borderhov);
+  }
+
+  .btn-danger {
+    @apply btn border;
+    background: rgba(239,68,68,0.1);
+    color: var(--red);
+    border-color: rgba(239,68,68,0.2);
+  }
+  .btn-danger:hover { background: rgba(239,68,68,0.2); }
+
+  .btn-success {
+    @apply btn border;
+    background: rgba(34,197,94,0.1);
+    color: var(--green);
+    border-color: rgba(34,197,94,0.2);
+  }
+  .btn-success:hover { background: rgba(34,197,94,0.2); }
+
+  .btn-secondary { @apply btn-ghost; }
+
+  /* ── Card ── */
+  .card {
+    @apply rounded-2xl p-5;
+    background: var(--card);
+    border: 1px solid var(--border);
+  }
+  .card-sm {
+    @apply rounded-xl p-4;
+    background: var(--card);
+    border: 1px solid var(--border);
+  }
+
+  /* ── Input ── */
+  .input {
+    @apply rounded-xl px-3 py-2 outline-none font-sans text-sm
+           transition-all duration-150;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+  }
+  .input::placeholder { color: var(--muted); }
+  .input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
+  }
+
+  /* ── Badge ── */
+  .badge {
+    @apply inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full;
+  }
+
+  /* ── Skeleton ── */
+  .skeleton {
+    background: linear-gradient(90deg,
+      var(--skeleton-a) 25%,
+      var(--skeleton-b) 50%,
+      var(--skeleton-a) 75%
+    );
+    background-size: 400% 100%;
+    animation: shimmer 1.8s infinite;
+    border-radius: 12px;
+  }
+
+  /* ── Toggle switch ── */
+  .toggle {
+    position: relative;
+    display: inline-block;
+    width: 40px;
+    height: 22px;
+    border-radius: 99px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    transition: background 0.2s, border-color 0.2s;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .toggle.on {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+  .toggle-knob {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--muted);
+    transition: transform 0.2s, background 0.2s;
+    pointer-events: none;
+  }
+  .toggle.on .toggle-knob {
+    transform: translateX(18px);
+    background: #fff;
+  }
+}
+
+/* Drag regions */
+.drag-region { -webkit-app-region: drag; }
+.no-drag     { -webkit-app-region: no-drag; }
+
+/* Nav active glow bar */
+.nav-active-glow {
+  position: relative;
+}
+.nav-active-glow.active::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 50%;
+  transform: translateY(-50%);
+  width: 3px; height: 55%;
+  border-radius: 0 3px 3px 0;
+  background: var(--accent);
+  box-shadow: 0 0 8px rgba(59,130,246,0.7);
+}
+
+/* Progress glow */
+.progress-glow { box-shadow: 0 0 10px rgba(59,130,246,0.45); }
+
+/* Glassmorphism — uses CSS vars so it works in both themes */
+.glass {
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  background: var(--card);
+  border: 1px solid var(--border);
+  opacity: 0.95;
+}
+
+/* Sidebar item hover — uses CSS var so it works in both themes */
+.sidebar-item-hover:hover {
+  background: var(--hover-overlay) !important;
+}
+
+/* Titlebar button hover — light-safe */
+.titlebar-btn:hover {
+  background: var(--hover-overlay) !important;
+  color: var(--text) !important;
+}
+.titlebar-btn.danger:hover {
+  background: var(--red) !important;
+  color: #fff !important;
+}
+
+@keyframes shimmer {
+  0%   { background-position: -400% 0; }
+  100% { background-position:  400% 0; }
+}
+
+/* Pulse animation for active idling */
+@keyframes idle-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+.idle-pulse { animation: idle-pulse 2s ease-in-out infinite; }

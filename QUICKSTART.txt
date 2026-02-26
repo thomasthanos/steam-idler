@@ -1,0 +1,30 @@
+# Steam Achievement Manager — Quick Start
+
+## 1. Install dependencies
+```
+npm install
+```
+
+## 2. Start development (3 terminals)
+```
+Terminal 1:  npm run dev:main      (compiles main process, watch mode)
+Terminal 2:  npm run dev:renderer  (Vite HMR server on :3000)
+Terminal 3:  npm run electron      (launches Electron)
+```
+
+## 3. Build for production
+```
+npm run build
+npm run package
+```
+Installer appears in /release
+
+## ⚠️ Requirements
+- Steam must be RUNNING before launching the app
+- Node.js >= 18
+
+## Notes on steamworks.js
+The native module binds directly to the Steam client process.
+AppId 480 (Spacewar) is used as fallback during development.
+To test with a real game, launch the game from Steam first,
+then select it in the Games tab.
