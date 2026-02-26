@@ -214,7 +214,7 @@ function createTray(): void {
         { type: 'separator' },
         ...idleSection,
         { type: 'separator' },
-        { label: 'Quit', icon: menuIcon('tray_quit'), click: () => { tray?.destroy(); idleManager.stopAll(); app.exit(0) } },
+        { label: 'Quit', icon: menuIcon('tray_quit'), click: () => forceQuit() },
       ])
 
       tray?.setContextMenu(contextMenu)
@@ -280,6 +280,7 @@ function createWindow(): void {
   })
 
   mainWindow.on('close', (e) => {
+    if (isQuitting) return  // let it close — we're quitting
     const settings = store.get('settings')
     if (settings.minimizeToTray) {
       e.preventDefault()
@@ -297,7 +298,7 @@ function createWindow(): void {
   ipcMain.on('window:close', () => {
     const settings = store.get('settings')
     if (settings.minimizeToTray) mainWindow?.hide()
-    else mainWindow?.close()
+    else { forceQuit() }
   })
 
   nativeTheme.on('updated', () => {
@@ -342,11 +343,13 @@ app.on('window-all-closed', () => {
 })
 
 let isQuitting = false
-function forceQuit() {
+
+export function forceQuit() {
   if (isQuitting) return
   isQuitting = true
+  tray?.destroy()
+  tray = null
   idleManager.stopAll()
-  // destroy with timeout so we never hang
   const timeout = setTimeout(() => app.exit(0), 3000)
   steamClient.destroy()
     .catch(() => {})
@@ -356,6 +359,4 @@ function forceQuit() {
     })
 }
 
-app.on('before-quit', () => {
-  forceQuit()
-})
+app.on('before-quit', () => forceQuit())

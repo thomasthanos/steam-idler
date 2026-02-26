@@ -12,6 +12,7 @@ export default function SettingsPage() {
   const { state: updaterState, check: checkUpdate, install: installUpdate } = useUpdater()
   const [apiKey, setApiKey] = useState(settings.steamApiKey ?? '')
   const [steamId, setSteamId] = useState(settings.steamId ?? '')
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [customAppIds, setCustomAppIds] = useState(settings.customAppIds ?? '')
   const [autostart, setAutostart] = useState(false)
 
@@ -20,6 +21,18 @@ export default function SettingsPage() {
     setSteamId(settings.steamId ?? '')
     setCustomAppIds(settings.customAppIds ?? '')
   }, [settings.steamApiKey, settings.steamId, settings.customAppIds])
+
+  // Auto-detect and save Steam ID on mount
+  useEffect(() => {
+    if (!settings.steamId) {
+      window.steam.getUserInfo().then(res => {
+        if (res.success && res.data?.steamId) {
+          setSteamId(res.data.steamId)
+          updateSettings({ steamId: res.data.steamId }).catch(() => {})
+        }
+      }).catch(() => {})
+    }
+  }, [])
 
   // Fetch real autostart state from OS
   useEffect(() => {
@@ -161,23 +174,6 @@ export default function SettingsPage() {
           </h2>
 
           <div>
-            <label className="text-sm font-medium block mb-1" style={{ color: 'var(--sub)' }}>Custom Steam ID64</label>
-            <p className="text-xs mb-2" style={{ color: 'var(--muted)' }}>
-              Override the logged-in user. Leave blank to use the local Steam session.
-            </p>
-            <div className="flex gap-2">
-              <input
-                className="input flex-1 font-mono text-sm"
-                placeholder="7656119…"
-                value={steamId}
-                onChange={e => setSteamId(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && save({ steamId })}
-              />
-              <button className="btn-primary" onClick={() => save({ steamId })}>Save</button>
-            </div>
-          </div>
-
-          <div>
             <label className="text-sm font-medium block mb-1" style={{ color: 'var(--sub)' }}>Custom Game AppIDs</label>
             <p className="text-xs mb-2" style={{ color: 'var(--muted)' }}>
               Comma-separated AppIDs to force-show in your library (e.g. <span className="font-mono" style={{ color: 'var(--sub)' }}>218, 4000</span>).
@@ -188,10 +184,11 @@ export default function SettingsPage() {
                 placeholder="218, 4000, …"
                 value={customAppIds}
                 onChange={e => setCustomAppIds(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && save({ customAppIds }).then(() => fetchGames(true))}
+                onKeyDown={e => e.key === 'Enter' && customAppIds.trim() && save({ customAppIds }).then(() => fetchGames(true))}
               />
               <button
                 className="btn-primary"
+                disabled={!customAppIds.trim()}
                 onClick={() => save({ customAppIds }).then(() => fetchGames(true))}
               >
                 Save
@@ -221,9 +218,15 @@ export default function SettingsPage() {
                 placeholder="XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
                 value={apiKey}
                 onChange={e => setApiKey(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && save({ steamApiKey: apiKey })}
+                onKeyDown={e => e.key === 'Enter' && apiKey.trim() && save({ steamApiKey: apiKey })}
               />
-              <button className="btn-primary" onClick={() => save({ steamApiKey: apiKey })}>Save</button>
+              <button
+                className="btn-primary"
+                disabled={!apiKey.trim()}
+                onClick={() => save({ steamApiKey: apiKey })}
+              >
+                Save
+              </button>
             </div>
           </div>
         </section>

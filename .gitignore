@@ -1,3 +1,5 @@
 /node_modules
 /release/win-unpacked
 *.exe
+/release
+/release
