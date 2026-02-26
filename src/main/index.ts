@@ -3,7 +3,7 @@ import { TRAY_ICONS } from './trayIcons'
 import * as path from 'path'
 import * as fs from 'fs'
 import { setupIpcHandlers } from './ipc/handlers'
-import { performStartupUpdateCheck, setupUpdater, SplashEvent } from './updater'
+import { performStartupUpdateCheck, setupUpdater, triggerBackgroundCheck, SplashEvent } from './updater'
 import { SteamClient } from './steam/client'
 import { IdleManager } from './steam/idleManager'
 import Store from 'electron-store'
@@ -259,7 +259,13 @@ function createWindow(): void {
     mainWindow.loadFile(path.join(app.getAppPath(), 'dist', 'renderer', 'index.html'))
   }
 
-  mainWindow.once('ready-to-show', () => mainWindow?.show())
+  mainWindow.once('ready-to-show', () => {
+    mainWindow?.show()
+    // Trigger a silent background update check so the renderer gets
+    // the updater status after the window is ready (the startup check
+    // runs before the window exists, so broadcast() has no target).
+    setTimeout(() => triggerBackgroundCheck(), 3000)
+  })
 
   mainWindow.webContents.on('console-message', (_e, level, message) => {
     if (message.includes('cdn.cloudflare.steamstatic.com')) return
@@ -331,7 +337,8 @@ app.whenReady().then(async () => {
 
 app.on('window-all-closed', () => {
   if (process.platform === 'darwin') return
-  if (tray) return
+  const settings = store.get('settings')
+  if (tray && settings.minimizeToTray) return
   forceQuit()
 })
 

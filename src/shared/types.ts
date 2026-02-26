@@ -107,6 +107,7 @@ export const IPC = {
   // Auto-updater
   UPDATER_CHECK:    'updater:check',
   UPDATER_INSTALL:  'updater:install',
+  UPDATER_RESTART:  'updater:restart',  // quit & install downloaded update
   UPDATER_STATUS:   'updater:status',   // push from main → renderer
 } as const
 

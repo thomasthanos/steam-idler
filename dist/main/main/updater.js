@@ -46,13 +46,14 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.performStartupUpdateCheck = performStartupUpdateCheck;
+exports.triggerBackgroundCheck = triggerBackgroundCheck;
 exports.setupUpdater = setupUpdater;
 const electron_1 = require("electron");
 const path = __importStar(require("path"));
 const electron_updater_1 = require("electron-updater");
 const types_1 = require("../shared/types");
 // ─── Configure ────────────────────────────────────────────────────────────────
-electron_updater_1.autoUpdater.autoDownload = false;
+electron_updater_1.autoUpdater.autoDownload = true;
 electron_updater_1.autoUpdater.autoInstallOnAppQuit = true;
 electron_updater_1.autoUpdater.allowPrerelease = false;
 electron_updater_1.autoUpdater.logger = null;
@@ -118,6 +119,10 @@ function performStartupUpdateCheck(onEvent) {
         electron_updater_1.autoUpdater.checkForUpdates().catch((err) => onError(err));
     });
 }
+// ─── triggerBackgroundCheck — silent re-check after main window is ready ────────
+function triggerBackgroundCheck() {
+    electron_updater_1.autoUpdater.checkForUpdates().catch(() => { });
+}
 // ─── setupUpdater — wires IPC + broadcast for the main app window ─────────────
 function setupUpdater() {
     electron_updater_1.autoUpdater.removeAllListeners();
@@ -137,6 +142,8 @@ function setupUpdater() {
     });
     electron_updater_1.autoUpdater.on('update-downloaded', (info) => {
         broadcast({ status: 'downloaded', version: info.version });
+        // Auto-install 3 seconds after download completes
+        setTimeout(() => electron_updater_1.autoUpdater.quitAndInstall(true, true), 3000);
     });
     electron_updater_1.autoUpdater.on('error', (err) => {
         const msg = err?.message ?? String(err);
@@ -164,5 +171,8 @@ function setupUpdater() {
         catch (e) {
             return { success: false, error: e.message };
         }
+    });
+    electron_1.ipcMain.handle(types_1.IPC.UPDATER_RESTART, () => {
+        electron_updater_1.autoUpdater.quitAndInstall(true, true);
     });
 }

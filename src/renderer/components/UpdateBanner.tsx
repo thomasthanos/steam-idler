@@ -1,9 +1,17 @@
 import { motion, AnimatePresence } from 'framer-motion'
-import { Download, X, RefreshCw, CheckCircle, AlertTriangle, Loader } from 'lucide-react'
+import { Download, RefreshCw, CheckCircle, AlertTriangle, Loader } from 'lucide-react'
 import { useUpdater } from '../hooks/useUpdater'
+import { useState, useEffect } from 'react'
 
 export default function UpdateBanner() {
-  const { state, install } = useUpdater()
+  const { state } = useUpdater()
+  const [countdown, setCountdown] = useState(3)
+
+  useEffect(() => {
+    if (state.status !== 'downloaded') { setCountdown(3); return }
+    const t = setInterval(() => setCountdown(c => Math.max(0, c - 1)), 1000)
+    return () => clearInterval(t)
+  }, [state.status])
 
   // Only show when there's something actionable
   const visible =
@@ -80,7 +88,7 @@ export default function UpdateBanner() {
                 <span className="font-semibold" style={{ color: 'var(--green)' }}>
                   v{state.version} ready
                 </span>
-                <span style={{ color: 'var(--muted)' }}> — restart to apply the update</span>
+                <span style={{ color: 'var(--muted)' }}> — restarting in {countdown}s…</span>
               </p>
             )}
             {state.status === 'error' && (
@@ -90,31 +98,7 @@ export default function UpdateBanner() {
             )}
           </div>
 
-          {/* Action button */}
-          {state.status === 'available' && (
-            <button
-              onClick={install}
-              className="shrink-0 flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all"
-              style={{ background: 'var(--accent)', color: '#fff' }}
-              onMouseEnter={e => { e.currentTarget.style.opacity = '0.85' }}
-              onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}
-            >
-              <Download className="w-3 h-3" />
-              Download
-            </button>
-          )}
-          {state.status === 'downloaded' && (
-            <button
-              onClick={() => window.steam.installUpdate()}
-              className="shrink-0 flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all"
-              style={{ background: 'var(--green)', color: '#000' }}
-              onMouseEnter={e => { e.currentTarget.style.opacity = '0.85' }}
-              onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}
-            >
-              <RefreshCw className="w-3 h-3" />
-              Restart & Install
-            </button>
-          )}
+
         </div>
       </motion.div>
     </AnimatePresence>

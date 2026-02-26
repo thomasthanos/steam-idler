@@ -292,7 +292,13 @@ function createWindow() {
         // app.getAppPath() returns the root of the asar/app folder reliably in production
         mainWindow.loadFile(path.join(electron_1.app.getAppPath(), 'dist', 'renderer', 'index.html'));
     }
-    mainWindow.once('ready-to-show', () => mainWindow?.show());
+    mainWindow.once('ready-to-show', () => {
+        mainWindow?.show();
+        // Trigger a silent background update check so the renderer gets
+        // the updater status after the window is ready (the startup check
+        // runs before the window exists, so broadcast() has no target).
+        setTimeout(() => (0, updater_1.triggerBackgroundCheck)(), 3000);
+    });
     mainWindow.webContents.on('console-message', (_e, level, message) => {
         if (message.includes('cdn.cloudflare.steamstatic.com'))
             return;
@@ -362,7 +368,8 @@ electron_1.app.whenReady().then(async () => {
 electron_1.app.on('window-all-closed', () => {
     if (process.platform === 'darwin')
         return;
-    if (tray)
+    const settings = store.get('settings');
+    if (tray && settings.minimizeToTray)
         return;
     forceQuit();
 });

@@ -17,7 +17,7 @@ import { autoUpdater, UpdateInfo, ProgressInfo } from 'electron-updater'
 import { IPC, UpdaterState } from '../shared/types'
 
 // ─── Configure ────────────────────────────────────────────────────────────────
-autoUpdater.autoDownload         = false
+autoUpdater.autoDownload         = true
 autoUpdater.autoInstallOnAppQuit = true
 autoUpdater.allowPrerelease      = false
 autoUpdater.logger               = null as any
@@ -102,6 +102,11 @@ export function performStartupUpdateCheck(
   })
 }
 
+// ─── triggerBackgroundCheck — silent re-check after main window is ready ────────
+export function triggerBackgroundCheck(): void {
+  autoUpdater.checkForUpdates().catch(() => { /* ignore */ })
+}
+
 // ─── setupUpdater — wires IPC + broadcast for the main app window ─────────────
 export function setupUpdater(): void {
   autoUpdater.removeAllListeners()
@@ -126,6 +131,8 @@ export function setupUpdater(): void {
 
   autoUpdater.on('update-downloaded', (info: UpdateInfo) => {
     broadcast({ status: 'downloaded', version: info.version })
+    // Auto-install 3 seconds after download completes
+    setTimeout(() => autoUpdater.quitAndInstall(true, true), 3000)
   })
 
   autoUpdater.on('error', (err: Error) => {
@@ -145,5 +152,9 @@ export function setupUpdater(): void {
   ipcMain.handle(IPC.UPDATER_INSTALL, async () => {
     try { await autoUpdater.downloadUpdate(); return { success: true } }
     catch (e: any) { return { success: false, error: e.message } }
+  })
+
+  ipcMain.handle(IPC.UPDATER_RESTART, () => {
+    autoUpdater.quitAndInstall(true, true)
   })
 }

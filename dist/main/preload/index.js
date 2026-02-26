@@ -36,6 +36,7 @@ const steamAPI = {
     // Auto-updater
     checkForUpdates: () => electron_1.ipcRenderer.invoke(types_1.IPC.UPDATER_CHECK),
     installUpdate: () => electron_1.ipcRenderer.invoke(types_1.IPC.UPDATER_INSTALL),
+    restartAndInstall: () => { electron_1.ipcRenderer.invoke(types_1.IPC.UPDATER_RESTART); },
     onUpdaterStatus: (cb) => {
         const handler = (_, state) => cb(state);
         electron_1.ipcRenderer.on(types_1.IPC.UPDATER_STATUS, handler);

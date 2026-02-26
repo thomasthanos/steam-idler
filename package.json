@@ -1,6 +1,6 @@
 {
   "name": "souvlatzidiko-unlocker",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "A modern Steam Achievement Manager built with Electron, React & TypeScript",
   "main": "dist/main/main/index.js",
   "scripts": {

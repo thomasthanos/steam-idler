@@ -76,6 +76,8 @@ const steamAPI = {
     ipcRenderer.invoke(IPC.UPDATER_CHECK),
   installUpdate: (): Promise<IPCResponse<void>> =>
     ipcRenderer.invoke(IPC.UPDATER_INSTALL),
+  restartAndInstall: (): void =>
+    { ipcRenderer.invoke(IPC.UPDATER_RESTART) },
   onUpdaterStatus: (cb: (state: import('../shared/types').UpdaterState) => void) => {
     const handler = (_: unknown, state: import('../shared/types').UpdaterState) => cb(state)
     ipcRenderer.on(IPC.UPDATER_STATUS, handler)
