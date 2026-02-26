@@ -74,10 +74,6 @@ const steamAPI = {
   // Auto-updater
   checkForUpdates: (): Promise<IPCResponse<void>> =>
     ipcRenderer.invoke(IPC.UPDATER_CHECK),
-  installUpdate: (): Promise<IPCResponse<void>> =>
-    ipcRenderer.invoke(IPC.UPDATER_INSTALL),
-  restartAndInstall: (): void =>
-    { ipcRenderer.invoke(IPC.UPDATER_RESTART) },
   onUpdaterStatus: (cb: (state: import('../shared/types').UpdaterState) => void) => {
     const handler = (_: unknown, state: import('../shared/types').UpdaterState) => cb(state)
     ipcRenderer.on(IPC.UPDATER_STATUS, handler)
@@ -97,8 +93,10 @@ const steamAPI = {
 
   // Theme listener
   onThemeChange: (cb: (theme: 'dark' | 'light') => void) => {
-    ipcRenderer.on('theme:changed', (_event, theme) => cb(theme))
-    return () => ipcRenderer.removeAllListeners('theme:changed')
+    const handler = (_event: Electron.IpcRendererEvent, theme: 'dark' | 'light') => cb(theme)
+    ipcRenderer.on('theme:changed', handler)
+    // Use removeListener (not removeAllListeners) so multiple subscribers can coexist
+    return () => ipcRenderer.removeListener('theme:changed', handler)
   },
 }
 

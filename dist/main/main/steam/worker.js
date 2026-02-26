@@ -37,6 +37,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const sw = __importStar(require("steamworks.js"));
+// runCallbacks may be a named export depending on the steamworks.js version
+const { runCallbacks } = sw;
 const axios_1 = __importDefault(require("axios"));
 // ─── State ──────────────────────────────────────────────────────────────────
 let client = null;
@@ -222,7 +224,7 @@ function startCallbackLoop() {
         return;
     callbackInterval = setInterval(() => {
         try {
-            sw.runCallbacks?.();
+            runCallbacks?.();
         }
         catch { /* ok */ }
     }, 250);
@@ -277,21 +279,14 @@ process.stdin.on('data', (chunk) => {
     }
 });
 process.stdin.on('end', () => process.exit(0));
-// ─── Idle loop ───────────────────────────────────────────────────────────────
-let idleInterval = null;
+// ─── Idle handler ────────────────────────────────────────────────────────────
+// No separate idle interval needed — startCallbackLoop() at INIT (250 ms)
+// already keeps Steamworks alive. A second loop would duplicate runCallbacks().
 function handleIdle(id) {
     if (!client) {
         send(id, false, undefined, 'Not initialised');
         return;
     }
-    // Callback loop already started at INIT — just confirm idling
-    if (!idleInterval) {
-        idleInterval = setInterval(() => {
-            try {
-                sw.runCallbacks?.();
-            }
-            catch { /* ok */ }
-        }, 1000);
-    }
+    // callbackLoop is already running from INIT — nothing extra to start
     send(id, true, { idling: true });
 }

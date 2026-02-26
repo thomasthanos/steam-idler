@@ -11,54 +11,23 @@
  * Config in electron-builder.json:
  *   "publish": { "provider": "github", "owner": "ThomasThanos", "repo": "steam-idler" }
  */
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.performStartupUpdateCheck = performStartupUpdateCheck;
 exports.triggerBackgroundCheck = triggerBackgroundCheck;
 exports.setupUpdater = setupUpdater;
 const electron_1 = require("electron");
-const path = __importStar(require("path"));
 const electron_updater_1 = require("electron-updater");
 const types_1 = require("../shared/types");
 // ─── Configure ────────────────────────────────────────────────────────────────
-electron_updater_1.autoUpdater.autoDownload = true;
+// autoDownload = false globally: we call downloadUpdate() manually so we can
+// show progress. The splash flow downloads on startup; the background check
+// (after window is shown) also auto-downloads silently so the user only
+// needs to approve the restart.
+// autoInstallOnAppQuit ensures the update is applied when the user quits normally.
+electron_updater_1.autoUpdater.autoDownload = false; // we call downloadUpdate() manually for control
 electron_updater_1.autoUpdater.autoInstallOnAppQuit = true;
 electron_updater_1.autoUpdater.allowPrerelease = false;
 electron_updater_1.autoUpdater.logger = null;
-// Store downloaded update installers under Roaming\ThomasThanos\Souvlatzidiko-Unlocker\updater
-electron_updater_1.autoUpdater.cachePath = path.join(electron_1.app.getPath('appData'), 'ThomasThanos', 'Souvlatzidiko-Unlocker', 'updater');
 // ─── Clean error messages (strip HTML bodies, truncate) ─────────────────────
 function cleanErrorMessage(err) {
     const raw = err?.message ?? String(err);
@@ -110,9 +79,9 @@ function performStartupUpdateCheck(onEvent, preload) {
             if (timeoutHandle)
                 clearTimeout(timeoutHandle);
             onEvent({ type: 'status', text: `Downloading v${info.version}…` });
-            // Manually trigger download during splash (autoDownload is disabled globally
-            // so that background checks after launch don't auto-download)
-            electron_updater_1.autoUpdater.downloadUpdate().catch(() => done());
+            // autoDownload = false globally, so we trigger the download manually here
+            // (only during the splash flow — background checks require a user click)
+            electron_updater_1.autoUpdater.downloadUpdate().catch((err) => onError(err));
         };
         const onNotAvailable = () => {
             onEvent({ type: 'status', text: 'Up to date.' });
@@ -173,6 +142,10 @@ function setupUpdater() {
             ? info.releaseNotes.map((n) => (typeof n === 'string' ? n : n?.note ?? '')).join('\n')
             : typeof info.releaseNotes === 'string' ? info.releaseNotes : undefined;
         broadcast({ status: 'available', version: info.version, releaseNotes: notes });
+        // Auto-download silently — user only needs to confirm the restart
+        electron_updater_1.autoUpdater.downloadUpdate().catch((err) => {
+            broadcast({ status: 'error', message: cleanErrorMessage(err) });
+        });
     });
     electron_updater_1.autoUpdater.on('update-not-available', (info) => {
         broadcast({ status: 'not-available', version: info.version });
@@ -183,7 +156,8 @@ function setupUpdater() {
     });
     electron_updater_1.autoUpdater.on('update-downloaded', (info) => {
         broadcast({ status: 'downloaded', version: info.version });
-        // Auto-install 3 seconds after download completes
+        // Fully automatic — restart & install after a 3-second grace period
+        // so the user can see the "restarting" message before the app closes.
         setTimeout(() => electron_updater_1.autoUpdater.quitAndInstall(true, true), 3000);
     });
     electron_updater_1.autoUpdater.on('error', (err) => {
@@ -198,14 +172,11 @@ function setupUpdater() {
             return { success: false, error: e.message };
         }
     });
+    // UPDATER_INSTALL is kept for IPC compatibility but is now a no-op.
+    // The download is triggered automatically by the 'update-available' event.
+    // Calling downloadUpdate() here again would cause a duplicate download.
     electron_1.ipcMain.handle(types_1.IPC.UPDATER_INSTALL, async () => {
-        try {
-            await electron_updater_1.autoUpdater.downloadUpdate();
-            return { success: true };
-        }
-        catch (e) {
-            return { success: false, error: e.message };
-        }
+        return { success: true };
     });
     electron_1.ipcMain.handle(types_1.IPC.UPDATER_RESTART, () => {
         electron_updater_1.autoUpdater.quitAndInstall(true, true);

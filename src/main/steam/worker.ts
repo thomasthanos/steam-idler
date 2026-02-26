@@ -1,4 +1,6 @@
 import * as sw from 'steamworks.js'
+// runCallbacks may be a named export depending on the steamworks.js version
+const { runCallbacks } = sw as any
 import axios from 'axios'
 
 type SteamClient = Omit<sw.Client, 'init' | 'runCallbacks'>
@@ -191,7 +193,7 @@ let callbackInterval: ReturnType<typeof setInterval> | null = null
 function startCallbackLoop() {
   if (callbackInterval) return
   callbackInterval = setInterval(() => {
-    try { (sw as any).runCallbacks?.() } catch { /* ok */ }
+    try { runCallbacks?.() } catch { /* ok */ }
   }, 250)
 }
 
@@ -222,16 +224,12 @@ process.stdin.on('data', (chunk: string) => {
 })
 process.stdin.on('end', () => process.exit(0))
 
-// ─── Idle loop ───────────────────────────────────────────────────────────────
-let idleInterval: ReturnType<typeof setInterval> | null = null
+// ─── Idle handler ────────────────────────────────────────────────────────────
+// No separate idle interval needed — startCallbackLoop() at INIT (250 ms)
+// already keeps Steamworks alive. A second loop would duplicate runCallbacks().
 
 function handleIdle(id: number) {
   if (!client) { send(id, false, undefined, 'Not initialised'); return }
-  // Callback loop already started at INIT — just confirm idling
-  if (!idleInterval) {
-    idleInterval = setInterval(() => {
-      try { (sw as any).runCallbacks?.() } catch { /* ok */ }
-    }, 1000)
-  }
+  // callbackLoop is already running from INIT — nothing extra to start
   send(id, true, { idling: true })
 }

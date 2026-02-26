@@ -6,8 +6,7 @@ import { setupIpcHandlers } from './ipc/handlers'
 import { performStartupUpdateCheck, setupUpdater, triggerBackgroundCheck, SplashEvent, PreloadFn } from './updater'
 import { SteamClient } from './steam/client'
 import { IdleManager } from './steam/idleManager'
-import Store from 'electron-store'
-import { AppSettings, DEFAULT_SETTINGS } from '../shared/types'
+import { getStore } from './store'
 
 // ─── Set app identity FIRST — must be before any new Store() call ─────────────
 app.setName('Souvlatzidiko-Unlocker')
@@ -18,13 +17,13 @@ app.setPath('userData', path.join(app.getPath('appData'), 'ThomasThanos', 'Souvl
 
 let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
+let trayUpdateInterval: ReturnType<typeof setInterval> | null = null
+let activateListenerRegistered = false
 const steamClient = new SteamClient()
 export const idleManager = new IdleManager()
 
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged
 
-// ─── Settings store ────────────────────────────────────────────────────────
-const store = new Store<{ settings: AppSettings }>({ defaults: { settings: DEFAULT_SETTINGS } })
 
 // ─── Single instance lock ─────────────────────────────────────────────────
 const gotLock = app.requestSingleInstanceLock()
@@ -101,7 +100,13 @@ async function runSplashFlow(onReady: () => void): Promise<void> {
 
   splash.loadFile(getSplashHtmlPath())
 
-  splash.once('ready-to-show', () => splash.show())
+  splash.once('ready-to-show', () => {
+    splash.show()
+    // Show the current app version in the bottom-right corner
+    splash.webContents.executeJavaScript(
+      `window._setVersion(${JSON.stringify(app.getVersion())})`
+    ).catch(() => {})
+  })
 
   // Helper: call a JS function defined in splash.html
   const call = (fn: string, ...args: unknown[]) => {
@@ -253,7 +258,9 @@ function createTray(): void {
       if (mainWindow?.isVisible()) mainWindow.focus()
       else { mainWindow?.show(); mainWindow?.focus() }
     })
-    setInterval(updateMenu, 5000)
+    // Store interval ID so we can clear it in forceQuit()
+    if (trayUpdateInterval) clearInterval(trayUpdateInterval)
+    trayUpdateInterval = setInterval(updateMenu, 5000)
   } catch (e) {
     console.error('[tray] Failed to create tray:', e)
   }
@@ -309,25 +316,16 @@ function createWindow(): void {
 
   mainWindow.on('close', (e) => {
     if (isQuitting) return  // let it close — we're quitting
-    const settings = store.get('settings')
+    const settings = getStore().get('settings')
     if (settings.minimizeToTray) {
       e.preventDefault()
       mainWindow?.hide()
     }
+    // minimizeToTray=false: let window close normally,
+    // window-all-closed will call forceQuit().
   })
 
   mainWindow.on('closed', () => { mainWindow = null })
-
-  ipcMain.on('window:minimize', () => mainWindow?.minimize())
-  ipcMain.on('window:maximize', () => {
-    if (mainWindow?.isMaximized()) mainWindow.unmaximize()
-    else mainWindow?.maximize()
-  })
-  ipcMain.on('window:close', () => {
-    const settings = store.get('settings')
-    if (settings.minimizeToTray) mainWindow?.hide()
-    else { forceQuit() }
-  })
 
   nativeTheme.on('updated', () => {
     mainWindow?.webContents.send(
@@ -337,35 +335,61 @@ function createWindow(): void {
   })
 }
 
+// ─── Window IPC (registered ONCE, not per window instance) ──────────────────
+// Registering inside createWindow() adds duplicate listeners on macOS when
+// the window is re-created after being closed (via app.on('activate')).
+function setupWindowIpc(): void {
+  ipcMain.on('window:minimize', () => mainWindow?.minimize())
+  ipcMain.on('window:maximize', () => {
+    if (mainWindow?.isMaximized()) mainWindow.unmaximize()
+    else mainWindow?.maximize()
+  })
+  ipcMain.on('window:close', () => {
+    const settings = getStore().get('settings')
+    if (settings.minimizeToTray) {
+      mainWindow?.hide()
+    } else {
+      forceQuit()
+    }
+  })
+}
+
 // ─── App lifecycle ─────────────────────────────────────────────────────────
 app.whenReady().then(async () => {
   setupIpcHandlers(steamClient, idleManager)
-  setupUpdater()
+  setupWindowIpc()  // Register window IPC once at startup
 
   await runSplashFlow(() => {
     createWindow()
     createTray()
+    // setupUpdater MUST be called after the splash flow so that
+    // autoUpdater.removeAllListeners() doesn't clobber the splash listeners.
+    setupUpdater()
 
-    const settings = store.get('settings')
+    const settings = getStore().get('settings')
     if (settings.autoIdleGames?.length) {
       for (const game of settings.autoIdleGames) {
         try {
-          idleManager.startIdle(game.appId)
+          idleManager.startIdle(game.appId, game.name)  // Fix: pass game.name
         } catch (e) {
           console.error(`[auto-idle] Failed to start ${game.appId}:`, e)
         }
       }
     }
 
-    app.on('activate', () => {
-      if (BrowserWindow.getAllWindows().length === 0) createWindow()
-    })
+    // Guard against duplicate 'activate' listeners on macOS
+    if (!activateListenerRegistered) {
+      activateListenerRegistered = true
+      app.on('activate', () => {
+        if (BrowserWindow.getAllWindows().length === 0) createWindow()
+      })
+    }
   })
 })
 
 app.on('window-all-closed', () => {
   if (process.platform === 'darwin') return
-  const settings = store.get('settings')
+  const settings = getStore().get('settings')
   if (tray && settings.minimizeToTray) return
   forceQuit()
 })
@@ -375,6 +399,10 @@ let isQuitting = false
 export function forceQuit() {
   if (isQuitting) return
   isQuitting = true
+  // Close the main window immediately (isQuitting=true bypasses the hide logic).
+  // If window is already closed/null this is a no-op.
+  mainWindow?.close()
+  if (trayUpdateInterval) { clearInterval(trayUpdateInterval); trayUpdateInterval = null }
   tray?.destroy()
   tray = null
   idleManager.stopAll()
@@ -387,4 +415,7 @@ export function forceQuit() {
     })
 }
 
-app.on('before-quit', () => forceQuit())
+// before-quit intentionally omitted: forceQuit() is triggered by
+// window-all-closed (native close) or explicitly from the IPC/tray Quit handler.
+// Hooking before-quit would double-invoke forceQuit() and conflicts with
+// autoUpdater.quitAndInstall() which also calls app.quit() internally.

@@ -35,8 +35,6 @@ const steamAPI = {
     stopGame: () => electron_1.ipcRenderer.invoke(types_1.IPC.STOP_GAME),
     // Auto-updater
     checkForUpdates: () => electron_1.ipcRenderer.invoke(types_1.IPC.UPDATER_CHECK),
-    installUpdate: () => electron_1.ipcRenderer.invoke(types_1.IPC.UPDATER_INSTALL),
-    restartAndInstall: () => { electron_1.ipcRenderer.invoke(types_1.IPC.UPDATER_RESTART); },
     onUpdaterStatus: (cb) => {
         const handler = (_, state) => cb(state);
         electron_1.ipcRenderer.on(types_1.IPC.UPDATER_STATUS, handler);
@@ -49,8 +47,10 @@ const steamAPI = {
     setAutostart: (enabled) => electron_1.ipcRenderer.invoke(types_1.IPC.AUTOSTART_SET, enabled),
     // Theme listener
     onThemeChange: (cb) => {
-        electron_1.ipcRenderer.on('theme:changed', (_event, theme) => cb(theme));
-        return () => electron_1.ipcRenderer.removeAllListeners('theme:changed');
+        const handler = (_event, theme) => cb(theme);
+        electron_1.ipcRenderer.on('theme:changed', handler);
+        // Use removeListener (not removeAllListeners) so multiple subscribers can coexist
+        return () => electron_1.ipcRenderer.removeListener('theme:changed', handler);
     },
 };
 const windowAPI = {

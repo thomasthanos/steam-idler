@@ -15,26 +15,24 @@ AutoCloseWindow true
 !macro customInit
   StrCpy $INSTDIR "$LOCALAPPDATA\ThomasThanos\Souvlatzidiko-Unlocker"
 
-  ; Kill running process if any
-  nsExec::ExecToStack 'wmic process where "name='\''Souvlatzidiko-Unlocker.exe'\''" get ProcessId /FORMAT:LIST'
+  ; Force-kill running process and wait up to 5s for it to fully exit
+  nsExec::ExecToStack 'taskkill /F /IM "Souvlatzidiko-Unlocker.exe" /T'
   Pop $0
   Pop $1
 
-  ${If} $0 == 0
-    ${StrStr} $2 $1 "ProcessId="
-    ${If} $2 != ""
-      StrCpy $0 0
-      wait_for_exit:
-        FindWindow $3 "" "Souvlatzidiko-Unlocker"
-        ${If} $3 == 0
-          Goto process_exited
-        ${EndIf}
-        IntOp $0 $0 + 1
-        IntCmp $0 5 process_exited
-        Sleep 250
-        Goto wait_for_exit
+  StrCpy $0 0
+  wait_for_exit:
+    nsExec::ExecToStack 'tasklist /FI "IMAGENAME eq Souvlatzidiko-Unlocker.exe" /NH'
+    Pop $2
+    Pop $3
+    ${StrStr} $4 $3 "Souvlatzidiko-Unlocker.exe"
+    ${If} $4 == ""
+      Goto process_exited
     ${EndIf}
-  ${EndIf}
+    IntOp $0 $0 + 1
+    IntCmp $0 20 process_exited
+    Sleep 250
+    Goto wait_for_exit
 
   process_exited:
 

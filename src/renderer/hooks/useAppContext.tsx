@@ -61,13 +61,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [gamesFetched])
 
   const updateSettings = async (partial: Partial<AppSettings>) => {
+    const prev = settings
     const next = { ...settings, ...partial }
-    setSettings(next)
-    await window.steam.setSettings(partial)
+    setSettings(next)  // optimistic update
+    const res = await window.steam.setSettings(partial)
+    if (!res.success) {
+      setSettings(prev)  // rollback on failure
+      throw new Error(res.error ?? 'Failed to save settings')
+    }
     const gameRelatedKeys: (keyof AppSettings)[] = ['customAppIds', 'steamApiKey', 'steamId']
     if (gameRelatedKeys.some((k) => k in partial)) {
-      setGamesFetched(false)
-      // Immediately re-fetch with force so Top Played / dashboard update right away
+      // Do the forced re-fetch directly here — do NOT call setGamesFetched(false) first,
+      // because that would change the fetchGames ref, triggering GamesPage's useEffect
+      // and causing a second concurrent getOwnedGames call (double-fetch race).
       setIsLoadingGames(true)
       try {
         const res = await window.steam.getOwnedGames(true)

@@ -39,13 +39,10 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.setupIpcHandlers = setupIpcHandlers;
 const electron_1 = require("electron");
 const path = __importStar(require("path"));
+const fs = __importStar(require("fs"));
 const axios_1 = __importDefault(require("axios"));
 const types_1 = require("../../shared/types");
-const electron_store_1 = __importDefault(require("electron-store"));
-const store = new electron_store_1.default({
-    name: 'config',
-    defaults: { settings: types_1.DEFAULT_SETTINGS },
-});
+const store_1 = require("../store");
 function wrap(fn) {
     return fn()
         .then((data) => ({ success: true, data }))
@@ -66,15 +63,24 @@ function setupIpcHandlers(steam, idle) {
     electron_1.ipcMain.handle(types_1.IPC.RESET_STATS, (_e, appId) => wrap(() => steam.resetAllStats(appId)));
     electron_1.ipcMain.handle(types_1.IPC.STOP_GAME, () => wrap(() => steam.stopGame()));
     // ── Settings ──────────────────────────────────────────────────────────────
-    electron_1.ipcMain.handle(types_1.IPC.GET_SETTINGS, () => ({
-        success: true,
-        data: store.get('settings'),
-    }));
+    electron_1.ipcMain.handle(types_1.IPC.GET_SETTINGS, () => {
+        try {
+            return { success: true, data: (0, store_1.getStore)().get('settings') };
+        }
+        catch (e) {
+            return { success: false, error: e.message };
+        }
+    });
     electron_1.ipcMain.handle(types_1.IPC.SET_SETTINGS, (_e, settings) => {
-        const current = store.get('settings');
-        const merged = { ...current, ...settings };
-        store.set('settings', merged);
-        return { success: true };
+        try {
+            const current = (0, store_1.getStore)().get('settings');
+            const merged = { ...current, ...settings };
+            (0, store_1.getStore)().set('settings', merged);
+            return { success: true };
+        }
+        catch (e) {
+            return { success: false, error: e.message };
+        }
     });
     // ── Idle ──────────────────────────────────────────────────────────────────
     electron_1.ipcMain.handle(types_1.IPC.IDLE_START, (_e, appId, name) => {
@@ -95,10 +101,14 @@ function setupIpcHandlers(steam, idle) {
             return { success: false, error: e.message };
         }
     });
-    electron_1.ipcMain.handle(types_1.IPC.IDLE_STATUS, () => ({
-        success: true,
-        data: idle.getIdlingAppIds(),
-    }));
+    electron_1.ipcMain.handle(types_1.IPC.IDLE_STATUS, () => {
+        try {
+            return { success: true, data: idle.getIdlingAppIds() };
+        }
+        catch (e) {
+            return { success: false, error: e.message };
+        }
+    });
     // ── Notifications ────────────────────────────────────────────────────────
     electron_1.ipcMain.handle(types_1.IPC.SEND_NOTIFICATION, (_e, title, body, silent) => {
         try {
@@ -111,7 +121,6 @@ function setupIpcHandlers(steam, idle) {
                 title = stripEmoji(title);
                 body = stripEmoji(body);
             }
-            const fs = require('fs');
             const iconCandidates = [
                 path.join(__dirname, '../../../resources/notify.png'),
                 path.join(electron_1.app.getAppPath(), 'resources/notify.png'),
@@ -238,8 +247,7 @@ function setupIpcHandlers(steam, idle) {
     // ── Autostart ─────────────────────────────────────────────────────────────
     electron_1.ipcMain.handle(types_1.IPC.AUTOSTART_GET, () => {
         try {
-            const loginSettings = electron_1.app.getLoginItemSettings();
-            return { success: true, data: loginSettings.openAtLogin };
+            return { success: true, data: electron_1.app.getLoginItemSettings().openAtLogin };
         }
         catch {
             return { success: true, data: false };

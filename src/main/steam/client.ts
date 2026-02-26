@@ -84,16 +84,33 @@ class WorkerBridge {
   private buffer = ''
   private currentAppId = 0
   private lastApiKey = ''
+  // Mutex: prevents concurrent ensure() calls from spawning two workers
+  private initPromise: Promise<void> | null = null
 
   private get workerPath(): string {
     return path.join(__dirname, 'worker.js')
   }
 
   async ensure(appId: number): Promise<void> {
+    // If an init is already in-flight, wait for it to complete before checking
+    if (this.initPromise) await this.initPromise
+
     const settings = getSettings()
     const apiKey = settings.steamApiKey ?? ''
 
     if (this.proc && this.currentAppId === appId && this.lastApiKey === apiKey) return
+
+    // Wrap the actual spawn work in a promise and store it so concurrent
+    // callers wait instead of spawning a second worker.
+    this.initPromise = this._doEnsure(appId, apiKey)
+    try {
+      await this.initPromise
+    } finally {
+      this.initPromise = null
+    }
+  }
+
+  private async _doEnsure(appId: number, apiKey: string): Promise<void> {
     await this.kill()
 
     const proc = spawn(process.execPath, [this.workerPath], {

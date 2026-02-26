@@ -72,6 +72,7 @@ class IdleManager {
         proc.stdin.write(JSON.stringify({ id: 2, type: 'IDLE' }) + '\n');
         proc.on('exit', () => {
             this.idlers.delete(appId);
+            this.names.delete(appId); // keep names in sync so getIdlingGames() stays consistent
         });
         this.idlers.set(appId, proc);
         console.log(`[idle] Started idling appId=${appId}`);

@@ -40,6 +40,7 @@ export class IdleManager {
 
     proc.on('exit', () => {
       this.idlers.delete(appId)
+      this.names.delete(appId)  // keep names in sync so getIdlingGames() stays consistent
     })
 
     this.idlers.set(appId, proc)

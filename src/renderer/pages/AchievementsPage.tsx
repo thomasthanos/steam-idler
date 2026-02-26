@@ -292,15 +292,24 @@ export default function AchievementsPage() {
 
             <div className="flex items-center gap-1.5">
               <button className="btn-success text-xs" disabled={actionLoading !== null || total === 0}
-                onClick={() => setConfirmDialog({ action: 'unlock-all', label: 'Unlock ALL achievements?' })}>
+                onClick={() => settings.confirmBulkActions
+                  ? setConfirmDialog({ action: 'unlock-all', label: 'Unlock ALL achievements?' })
+                  : handleBulkAction('unlock-all')
+                }>
                 <Unlock className="w-3 h-3" /> Unlock All
               </button>
               <button className="btn-danger text-xs" disabled={actionLoading !== null || total === 0}
-                onClick={() => setConfirmDialog({ action: 'lock-all', label: 'Lock ALL achievements?' })}>
+                onClick={() => settings.confirmBulkActions
+                  ? setConfirmDialog({ action: 'lock-all', label: 'Lock ALL achievements?' })
+                  : handleBulkAction('lock-all')
+                }>
                 <Lock className="w-3 h-3" /> Lock All
               </button>
               <button className="btn-danger text-xs" disabled={actionLoading !== null}
-                onClick={() => setConfirmDialog({ action: 'reset-stats', label: 'Reset ALL stats & achievements?' })}>
+                onClick={() => settings.confirmBulkActions
+                  ? setConfirmDialog({ action: 'reset-stats', label: 'Reset ALL stats & achievements?' })
+                  : handleBulkAction('reset-stats')
+                }>
                 <AlertTriangle className="w-3 h-3" /> Reset
               </button>
             </div>

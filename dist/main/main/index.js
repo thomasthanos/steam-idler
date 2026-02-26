@@ -32,9 +32,6 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.idleManager = void 0;
 exports.forceQuit = forceQuit;
@@ -46,8 +43,7 @@ const handlers_1 = require("./ipc/handlers");
 const updater_1 = require("./updater");
 const client_1 = require("./steam/client");
 const idleManager_1 = require("./steam/idleManager");
-const electron_store_1 = __importDefault(require("electron-store"));
-const types_1 = require("../shared/types");
+const store_1 = require("./store");
 // ─── Set app identity FIRST — must be before any new Store() call ─────────────
 electron_1.app.setName('Souvlatzidiko-Unlocker');
 if (process.platform === 'win32') {
@@ -56,11 +52,11 @@ if (process.platform === 'win32') {
 electron_1.app.setPath('userData', path.join(electron_1.app.getPath('appData'), 'ThomasThanos', 'Souvlatzidiko-Unlocker'));
 let mainWindow = null;
 let tray = null;
+let trayUpdateInterval = null;
+let activateListenerRegistered = false;
 const steamClient = new client_1.SteamClient();
 exports.idleManager = new idleManager_1.IdleManager();
 const isDev = process.env.NODE_ENV === 'development' || !electron_1.app.isPackaged;
-// ─── Settings store ────────────────────────────────────────────────────────
-const store = new electron_store_1.default({ defaults: { settings: types_1.DEFAULT_SETTINGS } });
 // ─── Single instance lock ─────────────────────────────────────────────────
 const gotLock = electron_1.app.requestSingleInstanceLock();
 if (!gotLock) {
@@ -139,7 +135,11 @@ async function runSplashFlow(onReady) {
         },
     });
     splash.loadFile(getSplashHtmlPath());
-    splash.once('ready-to-show', () => splash.show());
+    splash.once('ready-to-show', () => {
+        splash.show();
+        // Show the current app version in the bottom-right corner
+        splash.webContents.executeJavaScript(`window._setVersion(${JSON.stringify(electron_1.app.getVersion())})`).catch(() => { });
+    });
     // Helper: call a JS function defined in splash.html
     const call = (fn, ...args) => {
         if (splash.isDestroyed())
@@ -285,7 +285,10 @@ function createTray() {
                 mainWindow?.focus();
             }
         });
-        setInterval(updateMenu, 5000);
+        // Store interval ID so we can clear it in forceQuit()
+        if (trayUpdateInterval)
+            clearInterval(trayUpdateInterval);
+        trayUpdateInterval = setInterval(updateMenu, 5000);
     }
     catch (e) {
         console.error('[tray] Failed to create tray:', e);
@@ -343,13 +346,23 @@ function createWindow() {
     mainWindow.on('close', (e) => {
         if (isQuitting)
             return; // let it close — we're quitting
-        const settings = store.get('settings');
+        const settings = (0, store_1.getStore)().get('settings');
         if (settings.minimizeToTray) {
             e.preventDefault();
             mainWindow?.hide();
         }
+        // minimizeToTray=false: let window close normally,
+        // window-all-closed will call forceQuit().
     });
     mainWindow.on('closed', () => { mainWindow = null; });
+    electron_1.nativeTheme.on('updated', () => {
+        mainWindow?.webContents.send('theme:changed', electron_1.nativeTheme.shouldUseDarkColors ? 'dark' : 'light');
+    });
+}
+// ─── Window IPC (registered ONCE, not per window instance) ──────────────────
+// Registering inside createWindow() adds duplicate listeners on macOS when
+// the window is re-created after being closed (via app.on('activate')).
+function setupWindowIpc() {
     electron_1.ipcMain.on('window:minimize', () => mainWindow?.minimize());
     electron_1.ipcMain.on('window:maximize', () => {
         if (mainWindow?.isMaximized())
@@ -358,45 +371,50 @@ function createWindow() {
             mainWindow?.maximize();
     });
     electron_1.ipcMain.on('window:close', () => {
-        const settings = store.get('settings');
-        if (settings.minimizeToTray)
+        const settings = (0, store_1.getStore)().get('settings');
+        if (settings.minimizeToTray) {
             mainWindow?.hide();
+        }
         else {
             forceQuit();
         }
-    });
-    electron_1.nativeTheme.on('updated', () => {
-        mainWindow?.webContents.send('theme:changed', electron_1.nativeTheme.shouldUseDarkColors ? 'dark' : 'light');
     });
 }
 // ─── App lifecycle ─────────────────────────────────────────────────────────
 electron_1.app.whenReady().then(async () => {
     (0, handlers_1.setupIpcHandlers)(steamClient, exports.idleManager);
-    (0, updater_1.setupUpdater)();
+    setupWindowIpc(); // Register window IPC once at startup
     await runSplashFlow(() => {
         createWindow();
         createTray();
-        const settings = store.get('settings');
+        // setupUpdater MUST be called after the splash flow so that
+        // autoUpdater.removeAllListeners() doesn't clobber the splash listeners.
+        (0, updater_1.setupUpdater)();
+        const settings = (0, store_1.getStore)().get('settings');
         if (settings.autoIdleGames?.length) {
             for (const game of settings.autoIdleGames) {
                 try {
-                    exports.idleManager.startIdle(game.appId);
+                    exports.idleManager.startIdle(game.appId, game.name); // Fix: pass game.name
                 }
                 catch (e) {
                     console.error(`[auto-idle] Failed to start ${game.appId}:`, e);
                 }
             }
         }
-        electron_1.app.on('activate', () => {
-            if (electron_1.BrowserWindow.getAllWindows().length === 0)
-                createWindow();
-        });
+        // Guard against duplicate 'activate' listeners on macOS
+        if (!activateListenerRegistered) {
+            activateListenerRegistered = true;
+            electron_1.app.on('activate', () => {
+                if (electron_1.BrowserWindow.getAllWindows().length === 0)
+                    createWindow();
+            });
+        }
     });
 });
 electron_1.app.on('window-all-closed', () => {
     if (process.platform === 'darwin')
         return;
-    const settings = store.get('settings');
+    const settings = (0, store_1.getStore)().get('settings');
     if (tray && settings.minimizeToTray)
         return;
     forceQuit();
@@ -406,6 +424,13 @@ function forceQuit() {
     if (isQuitting)
         return;
     isQuitting = true;
+    // Close the main window immediately (isQuitting=true bypasses the hide logic).
+    // If window is already closed/null this is a no-op.
+    mainWindow?.close();
+    if (trayUpdateInterval) {
+        clearInterval(trayUpdateInterval);
+        trayUpdateInterval = null;
+    }
     tray?.destroy();
     tray = null;
     exports.idleManager.stopAll();
@@ -417,4 +442,7 @@ function forceQuit() {
         electron_1.app.exit(0);
     });
 }
-electron_1.app.on('before-quit', () => forceQuit());
+// before-quit intentionally omitted: forceQuit() is triggered by
+// window-all-closed (native close) or explicitly from the IPC/tray Quit handler.
+// Hooking before-quit would double-invoke forceQuit() and conflicts with
+// autoUpdater.quitAndInstall() which also calls app.quit() internally.

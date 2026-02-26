@@ -11,18 +11,20 @@
  *   "publish": { "provider": "github", "owner": "ThomasThanos", "repo": "steam-idler" }
  */
 
-import { app, BrowserWindow, ipcMain } from 'electron'
-import * as path from 'path'
+import { BrowserWindow, ipcMain } from 'electron'
 import { autoUpdater, UpdateInfo, ProgressInfo } from 'electron-updater'
 import { IPC, UpdaterState } from '../shared/types'
 
 // ─── Configure ────────────────────────────────────────────────────────────────
-autoUpdater.autoDownload         = true
+// autoDownload = false globally: we call downloadUpdate() manually so we can
+// show progress. The splash flow downloads on startup; the background check
+// (after window is shown) also auto-downloads silently so the user only
+// needs to approve the restart.
+// autoInstallOnAppQuit ensures the update is applied when the user quits normally.
+autoUpdater.autoDownload         = false   // we call downloadUpdate() manually for control
 autoUpdater.autoInstallOnAppQuit = true
 autoUpdater.allowPrerelease      = false
 autoUpdater.logger               = null as any
-// Store downloaded update installers under Roaming\ThomasThanos\Souvlatzidiko-Unlocker\updater
-(autoUpdater as any).cachePath = path.join(app.getPath('appData'), 'ThomasThanos', 'Souvlatzidiko-Unlocker', 'updater')
 
 // ─── SplashEvent — sent from updater → splash window ──────────────────────────
 export type SplashEvent =
@@ -85,9 +87,9 @@ export function performStartupUpdateCheck(
     const onAvailable = (info: UpdateInfo) => {
       if (timeoutHandle) clearTimeout(timeoutHandle)
       onEvent({ type: 'status', text: `Downloading v${info.version}…` })
-      // Manually trigger download during splash (autoDownload is disabled globally
-      // so that background checks after launch don't auto-download)
-      autoUpdater.downloadUpdate().catch(() => done())
+      // autoDownload = false globally, so we trigger the download manually here
+      // (only during the splash flow — background checks require a user click)
+      autoUpdater.downloadUpdate().catch((err: Error) => onError(err))
     }
 
     const onNotAvailable = () => {
@@ -158,6 +160,10 @@ export function setupUpdater(): void {
       ? info.releaseNotes.map((n: any) => (typeof n === 'string' ? n : n?.note ?? '')).join('\n')
       : typeof info.releaseNotes === 'string' ? info.releaseNotes : undefined
     broadcast({ status: 'available', version: info.version, releaseNotes: notes })
+    // Auto-download silently — user only needs to confirm the restart
+    autoUpdater.downloadUpdate().catch((err: Error) => {
+      broadcast({ status: 'error', message: cleanErrorMessage(err) })
+    })
   })
 
   autoUpdater.on('update-not-available', (info: UpdateInfo) => {
@@ -171,7 +177,8 @@ export function setupUpdater(): void {
 
   autoUpdater.on('update-downloaded', (info: UpdateInfo) => {
     broadcast({ status: 'downloaded', version: info.version })
-    // Auto-install 3 seconds after download completes
+    // Fully automatic — restart & install after a 3-second grace period
+    // so the user can see the "restarting" message before the app closes.
     setTimeout(() => autoUpdater.quitAndInstall(true, true), 3000)
   })
 
@@ -184,9 +191,11 @@ export function setupUpdater(): void {
     catch (e: any) { return { success: false, error: e.message } }
   })
 
+  // UPDATER_INSTALL is kept for IPC compatibility but is now a no-op.
+  // The download is triggered automatically by the 'update-available' event.
+  // Calling downloadUpdate() here again would cause a duplicate download.
   ipcMain.handle(IPC.UPDATER_INSTALL, async () => {
-    try { await autoUpdater.downloadUpdate(); return { success: true } }
-    catch (e: any) { return { success: false, error: e.message } }
+    return { success: true }
   })
 
   ipcMain.handle(IPC.UPDATER_RESTART, () => {

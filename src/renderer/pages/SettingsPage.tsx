@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Settings, Moon, Sun, Monitor, Key, Shield, Bell, Eye, Power, BellOff, Volume2, RefreshCw, Download, CheckCircle } from 'lucide-react'
+import { Settings, Moon, Sun, Monitor, Key, Shield, Bell, Eye, Power, Volume2, RefreshCw, Download, CheckCircle } from 'lucide-react'
 import { useUpdater } from '../hooks/useUpdater'
 import { AppSettings } from '@shared/types'
 import { useAppContext } from '../hooks/useAppContext'
@@ -8,11 +8,10 @@ import toast from 'react-hot-toast'
 import clsx from 'clsx'
 
 export default function SettingsPage() {
-  const { settings, updateSettings, fetchGames } = useAppContext()
-  const { state: updaterState, check: checkUpdate, install: installUpdate } = useUpdater()
+  const { settings, updateSettings } = useAppContext()
+  const { state: updaterState, check: checkUpdate } = useUpdater()
   const [apiKey, setApiKey] = useState(settings.steamApiKey ?? '')
   const [steamId, setSteamId] = useState(settings.steamId ?? '')
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [customAppIds, setCustomAppIds] = useState(settings.customAppIds ?? '')
   const [autostart, setAutostart] = useState(false)
 
@@ -66,10 +65,10 @@ export default function SettingsPage() {
   }
 
   const behaviorToggles = [
-    { key: 'confirmBulkActions'    as const, icon: Bell,    label: 'Confirm bulk actions',       desc: 'Show dialog before unlock/lock all' },
-    { key: 'showGlobalPercent'     as const, icon: Eye,     label: 'Show global completion %',   desc: 'Show % of players who have each achievement' },
-    { key: 'showHiddenAchievements'as const, icon: Eye,     label: 'Show hidden achievements',   desc: 'Reveal hidden achievements before unlock' },
-    { key: 'minimizeToTray'        as const, icon: Monitor, label: 'Minimize to tray',            desc: 'Keep running in background when closed' },
+    { key: 'confirmBulkActions'     as const, icon: Bell, label: 'Confirm bulk actions',     desc: 'Show dialog before unlock/lock all' },
+    { key: 'showGlobalPercent'      as const, icon: Eye,  label: 'Show global completion %', desc: 'Show % of players who have each achievement' },
+    { key: 'showHiddenAchievements' as const, icon: Eye,  label: 'Show hidden achievements', desc: 'Reveal hidden achievements before unlock' },
+    // NOTE: minimizeToTray is already in the System section above — do NOT add it here again
   ]
 
   return (
@@ -184,12 +183,12 @@ export default function SettingsPage() {
                 placeholder="218, 4000, …"
                 value={customAppIds}
                 onChange={e => setCustomAppIds(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && customAppIds.trim() && save({ customAppIds }).then(() => fetchGames(true))}
+                onKeyDown={e => e.key === 'Enter' && customAppIds.trim() && save({ customAppIds })}
               />
               <button
                 className="btn-primary"
                 disabled={!customAppIds.trim()}
-                onClick={() => save({ customAppIds }).then(() => fetchGames(true))}
+                onClick={() => save({ customAppIds })}
               >
                 Save
               </button>
@@ -321,7 +320,7 @@ export default function SettingsPage() {
             {/* Check for updates button */}
             <button
               onClick={checkUpdate}
-              disabled={updaterState.status === 'checking' || updaterState.status === 'downloading'}
+              disabled={updaterState.status === 'checking' || updaterState.status === 'available' || updaterState.status === 'downloading' || updaterState.status === 'downloaded'}
               className="btn-ghost text-xs shrink-0 flex items-center gap-1.5"
               style={
                 updaterState.status === 'downloaded'
@@ -331,35 +330,38 @@ export default function SettingsPage() {
                     : {}
               }
             >
-              {updaterState.status === 'checking' && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
-              {updaterState.status === 'downloading' && <Download className="w-3.5 h-3.5 animate-pulse" />}
-              {updaterState.status === 'downloaded' && <CheckCircle className="w-3.5 h-3.5" style={{ color: 'var(--green)' }} />}
+              {updaterState.status === 'checking'                         && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
+              {(updaterState.status === 'available' || updaterState.status === 'downloading') && <Download className="w-3.5 h-3.5 animate-pulse" />}
+              {updaterState.status === 'downloaded'                        && <CheckCircle className="w-3.5 h-3.5" style={{ color: 'var(--green)' }} />}
               {(updaterState.status === 'idle' || updaterState.status === 'not-available' || updaterState.status === 'error') && <RefreshCw className="w-3.5 h-3.5" />}
-              {updaterState.status === 'available' && <Download className="w-3.5 h-3.5" />}
 
               {updaterState.status === 'idle'          && 'Check for updates'}
               {updaterState.status === 'checking'      && 'Checking…'}
               {updaterState.status === 'not-available' && 'Up to date'}
-              {updaterState.status === 'available'     && `v${updaterState.version} available`}
-              {updaterState.status === 'downloading'   && `${updaterState.percent}%`}
-              {updaterState.status === 'downloaded'    && 'Restart to install'}
+              {updaterState.status === 'available'     && `Downloading v${updaterState.version}…`}
+              {updaterState.status === 'downloading'   && `Downloading — ${updaterState.percent}%`}
+              {updaterState.status === 'downloaded'    && `v${updaterState.version} ready`}
               {updaterState.status === 'error'         && 'Retry check'}
             </button>
           </div>
 
-          {/* Download action when available */}
-          {updaterState.status === 'available' && (
-            <div className="flex items-center justify-between rounded-xl px-3 py-2.5"
+          {/* Downloading — auto-started when update found */}
+          {(updaterState.status === 'available' || updaterState.status === 'downloading') && (
+            <div className="rounded-xl px-3 py-2.5"
               style={{ background: 'rgba(59,130,246,0.07)', border: '1px solid rgba(59,130,246,0.2)' }}>
-              <div>
-                <p className="text-xs font-semibold" style={{ color: 'var(--accent)' }}>v{updaterState.version} ready to download</p>
-                {updaterState.releaseNotes && (
-                  <p className="text-xs mt-0.5 max-w-xs truncate" style={{ color: 'var(--muted)' }}>{updaterState.releaseNotes}</p>
-                )}
-              </div>
-              <button onClick={installUpdate} className="btn-primary text-xs">
-                <Download className="w-3 h-3" /> Download
-              </button>
+              <p className="text-xs font-semibold" style={{ color: 'var(--accent)' }}>
+                {updaterState.status === 'available'
+                  ? `Downloading v${updaterState.version}…`
+                  : `Downloading v${updaterState.version} — ${updaterState.percent}%`}
+              </p>
+              {updaterState.status === 'downloading' && (
+                <div className="mt-1.5 h-1 rounded-full overflow-hidden" style={{ background: 'var(--border)' }}>
+                  <div className="h-full rounded-full transition-all duration-300" style={{ width: `${updaterState.percent}%`, background: 'var(--accent)' }} />
+                </div>
+              )}
+              {(updaterState as any).releaseNotes && (
+                <p className="text-xs mt-1 max-w-xs truncate" style={{ color: 'var(--muted)' }}>{(updaterState as any).releaseNotes}</p>
+              )}
             </div>
           )}
 
@@ -371,14 +373,14 @@ export default function SettingsPage() {
             </div>
           )}
 
-          {/* Restart when downloaded */}
+          {/* Downloaded — restarting automatically */}
           {updaterState.status === 'downloaded' && (
-            <div className="flex items-center justify-between rounded-xl px-3 py-2.5"
+            <div className="flex items-center gap-2 rounded-xl px-3 py-2.5"
               style={{ background: 'rgba(34,197,94,0.07)', border: '1px solid rgba(34,197,94,0.2)' }}>
-              <p className="text-xs font-semibold" style={{ color: 'var(--green)' }}>v{updaterState.version} downloaded — restart to apply</p>
-              <button onClick={() => window.steam.installUpdate()} className="btn-ghost text-xs" style={{ color: 'var(--green)', borderColor: 'rgba(34,197,94,0.3)' }}>
-                <RefreshCw className="w-3 h-3" /> Restart
-              </button>
+              <RefreshCw className="w-3.5 h-3.5 animate-spin shrink-0" style={{ color: 'var(--green)' }} />
+              <p className="text-xs font-semibold" style={{ color: 'var(--green)' }}>
+                v{updaterState.version} downloaded — restarting automatically…
+              </p>
             </div>
           )}
         </section>

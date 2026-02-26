@@ -1,15 +1,11 @@
 import { app, ipcMain, Notification } from 'electron'
 import * as path from 'path'
+import * as fs from 'fs'
 import axios from 'axios'
-import { IPC, IPCResponse, AppSettings, DEFAULT_SETTINGS, IdleGame, FeaturedGame } from '../../shared/types'
+import { IPC, IPCResponse, AppSettings, IdleGame, FeaturedGame } from '../../shared/types'
 import { SteamClient } from '../steam/client'
 import { IdleManager } from '../steam/idleManager'
-import Store from 'electron-store'
-
-const store = new Store<{ settings: AppSettings }>({
-  name: 'config',
-  defaults: { settings: DEFAULT_SETTINGS },
-})
+import { getStore } from '../store'
 
 function wrap<T>(fn: () => Promise<T>): Promise<IPCResponse<T>> {
   return fn()
@@ -62,16 +58,18 @@ export function setupIpcHandlers(steam: SteamClient, idle: IdleManager): void {
   )
 
   // ── Settings ──────────────────────────────────────────────────────────────
-  ipcMain.handle(IPC.GET_SETTINGS, () => ({
-    success: true,
-    data: store.get('settings'),
-  }))
+  ipcMain.handle(IPC.GET_SETTINGS, () => {
+    try { return { success: true, data: getStore().get('settings') } }
+    catch (e: any) { return { success: false, error: e.message } }
+  })
 
   ipcMain.handle(IPC.SET_SETTINGS, (_e, settings: Partial<AppSettings>) => {
-    const current = store.get('settings')
-    const merged = { ...current, ...settings }
-    store.set('settings', merged)
-    return { success: true }
+    try {
+      const current = getStore().get('settings')
+      const merged = { ...current, ...settings }
+      getStore().set('settings', merged)
+      return { success: true }
+    } catch (e: any) { return { success: false, error: e.message } }
   })
 
   // ── Idle ──────────────────────────────────────────────────────────────────
@@ -93,10 +91,10 @@ export function setupIpcHandlers(steam: SteamClient, idle: IdleManager): void {
     }
   })
 
-  ipcMain.handle(IPC.IDLE_STATUS, () => ({
-    success: true,
-    data: idle.getIdlingAppIds(),
-  }))
+  ipcMain.handle(IPC.IDLE_STATUS, () => {
+    try { return { success: true, data: idle.getIdlingAppIds() } }
+    catch (e: any) { return { success: false, error: e.message } }
+  })
 
   // ── Notifications ────────────────────────────────────────────────────────
   ipcMain.handle(IPC.SEND_NOTIFICATION, (_e, title: string, body: string, silent: boolean) => {
@@ -116,7 +114,6 @@ export function setupIpcHandlers(steam: SteamClient, idle: IdleManager): void {
         body  = stripEmoji(body)
       }
 
-      const fs = require('fs')
       const iconCandidates = [
         path.join(__dirname, '../../../resources/notify.png'),
         path.join(app.getAppPath(), 'resources/notify.png'),
@@ -246,12 +243,8 @@ export function setupIpcHandlers(steam: SteamClient, idle: IdleManager): void {
 
   // ── Autostart ─────────────────────────────────────────────────────────────
   ipcMain.handle(IPC.AUTOSTART_GET, () => {
-    try {
-      const loginSettings = app.getLoginItemSettings()
-      return { success: true, data: loginSettings.openAtLogin }
-    } catch {
-      return { success: true, data: false }
-    }
+    try { return { success: true, data: app.getLoginItemSettings().openAtLogin } }
+    catch { return { success: true, data: false } }
   })
 
   ipcMain.handle(IPC.AUTOSTART_SET, (_e, enabled: boolean) => {

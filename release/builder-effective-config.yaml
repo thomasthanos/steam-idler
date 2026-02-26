@@ -20,6 +20,11 @@ executableName: Souvlatzidiko-Unlocker
 extraResources:
   - from: resources/all_steam_x256.ico
     to: all_steam_x256.ico
+  - from: resources/notify.png
+    to: notify.png
+  - from: resources/steam.png
+    to: steam.png
+artifactName: Souvlatzidiko-Unlocker-Setup.${ext}
 win:
   target:
     - target: nsis
