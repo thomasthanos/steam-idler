@@ -67,6 +67,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const gameRelatedKeys: (keyof AppSettings)[] = ['customAppIds', 'steamApiKey', 'steamId']
     if (gameRelatedKeys.some((k) => k in partial)) {
       setGamesFetched(false)
+      // Immediately re-fetch with force so Top Played / dashboard update right away
+      setIsLoadingGames(true)
+      try {
+        const res = await window.steam.getOwnedGames(true)
+        if (res.success && res.data) {
+          setGames(res.data)
+          setGamesFetched(true)
+        }
+      } catch { /* silent */ } finally {
+        setIsLoadingGames(false)
+      }
     }
   }
 

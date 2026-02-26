@@ -29,6 +29,22 @@ export type SplashEvent =
   | { type: 'status';   text: string; cls?: string }
   | { type: 'progress'; percent: number }
 
+// ─── Clean error messages (strip HTML bodies, truncate) ─────────────────────
+function cleanErrorMessage(err: Error): string {
+  const raw = err?.message ?? String(err)
+  // If it contains HTML (e.g. GitHub 504 page), just return a clean message
+  if (raw.includes('<!DOCTYPE') || raw.includes('<html')) {
+    const statusMatch = raw.match(/(\d{3})/)
+    const code = statusMatch ? statusMatch[1] : ''
+    if (code === '504' || code === '502' || code === '503') return `GitHub servers unavailable (${code}). Try again later.`
+    return 'Update server returned an unexpected response.'
+  }
+  if (raw.includes('net::ERR') || raw.includes('ENOTFOUND') || raw.includes('ETIMEDOUT')) return 'No internet connection.'
+  if (raw.includes('ECONNREFUSED') || raw.includes('EAI_AGAIN')) return 'Could not reach update server.'
+  // Truncate long messages
+  return raw.length > 120 ? raw.slice(0, 120) + '…' : raw
+}
+
 // ─── Broadcast to all renderer windows (used after app loads) ─────────────────
 function broadcast(state: UpdaterState) {
   for (const win of BrowserWindow.getAllWindows()) {
@@ -88,11 +104,11 @@ export function performStartupUpdateCheck(
     }
 
     const onError = (err: Error) => {
-      const msg = err?.message ?? String(err)
-      const isNetwork = msg.includes('net::ERR') || msg.includes('ENOTFOUND') || msg.includes('ETIMEDOUT')
+      const msg = cleanErrorMessage(err)
+      const isNetwork = msg.includes('No internet') || msg.includes('unavailable') || msg.includes('unexpected response')
       onEvent({
         type: 'status',
-        text: isNetwork ? 'No internet — skipping update.' : 'Update check failed.',
+        text: isNetwork ? 'No internet — skipping update.' : `Update check failed: ${msg}`,
         cls: 'warn',
       })
       setTimeout(done, 800)
@@ -149,12 +165,7 @@ export function setupUpdater(): void {
   })
 
   autoUpdater.on('error', (err: Error) => {
-    const msg = err?.message ?? String(err)
-    if (msg.includes('net::ERR') || msg.includes('ENOTFOUND')) {
-      broadcast({ status: 'error', message: 'Could not reach update server.' })
-    } else {
-      broadcast({ status: 'error', message: msg })
-    }
+    broadcast({ status: 'error', message: cleanErrorMessage(err) })
   })
 
   ipcMain.handle(IPC.UPDATER_CHECK, async () => {

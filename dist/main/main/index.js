@@ -37,6 +37,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.idleManager = void 0;
+exports.forceQuit = forceQuit;
 const electron_1 = require("electron");
 const trayIcons_1 = require("./trayIcons");
 const path = __importStar(require("path"));
@@ -246,7 +247,7 @@ function createTray() {
                 { type: 'separator' },
                 ...idleSection,
                 { type: 'separator' },
-                { label: 'Quit', icon: menuIcon('tray_quit'), click: () => { tray?.destroy(); exports.idleManager.stopAll(); electron_1.app.exit(0); } },
+                { label: 'Quit', icon: menuIcon('tray_quit'), click: () => forceQuit() },
             ]);
             tray?.setContextMenu(contextMenu);
         };
@@ -315,6 +316,8 @@ function createWindow() {
         return { action: 'deny' };
     });
     mainWindow.on('close', (e) => {
+        if (isQuitting)
+            return; // let it close — we're quitting
         const settings = store.get('settings');
         if (settings.minimizeToTray) {
             e.preventDefault();
@@ -333,8 +336,9 @@ function createWindow() {
         const settings = store.get('settings');
         if (settings.minimizeToTray)
             mainWindow?.hide();
-        else
-            mainWindow?.close();
+        else {
+            forceQuit();
+        }
     });
     electron_1.nativeTheme.on('updated', () => {
         mainWindow?.webContents.send('theme:changed', electron_1.nativeTheme.shouldUseDarkColors ? 'dark' : 'light');
@@ -377,8 +381,9 @@ function forceQuit() {
     if (isQuitting)
         return;
     isQuitting = true;
+    tray?.destroy();
+    tray = null;
     exports.idleManager.stopAll();
-    // destroy with timeout so we never hang
     const timeout = setTimeout(() => electron_1.app.exit(0), 3000);
     steamClient.destroy()
         .catch(() => { })
@@ -387,6 +392,4 @@ function forceQuit() {
         electron_1.app.exit(0);
     });
 }
-electron_1.app.on('before-quit', () => {
-    forceQuit();
-});
+electron_1.app.on('before-quit', () => forceQuit());

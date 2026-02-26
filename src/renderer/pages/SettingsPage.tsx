@@ -363,6 +363,14 @@ export default function SettingsPage() {
             </div>
           )}
 
+          {/* Error details */}
+          {updaterState.status === 'error' && updaterState.message && (
+            <div className="flex items-center gap-2 rounded-xl px-3 py-2.5"
+              style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.18)' }}>
+              <p className="text-xs" style={{ color: 'var(--red)' }}>{updaterState.message}</p>
+            </div>
+          )}
+
           {/* Restart when downloaded */}
           {updaterState.status === 'downloaded' && (
             <div className="flex items-center justify-between rounded-xl px-3 py-2.5"
