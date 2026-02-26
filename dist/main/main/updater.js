@@ -70,8 +70,17 @@ function broadcast(state) {
 // ─── performStartupUpdateCheck ────────────────────────────────────────────────
 function performStartupUpdateCheck(onEvent) {
     return new Promise((resolve) => {
-        const done = () => resolve();
-        onEvent({ type: 'status', text: 'Checking for updates…' });
+        let finished = false;
+        let timeoutHandle = null;
+        const done = () => {
+            if (finished)
+                return;
+            finished = true;
+            if (timeoutHandle)
+                clearTimeout(timeoutHandle);
+            cleanup();
+            resolve();
+        };
         const cleanup = () => {
             electron_updater_1.autoUpdater.removeListener('update-available', onAvailable);
             electron_updater_1.autoUpdater.removeListener('update-not-available', onNotAvailable);
@@ -80,12 +89,13 @@ function performStartupUpdateCheck(onEvent) {
             electron_updater_1.autoUpdater.removeListener('error', onError);
         };
         const onAvailable = (info) => {
+            if (timeoutHandle)
+                clearTimeout(timeoutHandle);
             onEvent({ type: 'status', text: `Downloading v${info.version}…` });
-            electron_updater_1.autoUpdater.downloadUpdate().catch(() => { cleanup(); done(); });
+            electron_updater_1.autoUpdater.downloadUpdate().catch(() => done());
         };
         const onNotAvailable = () => {
             onEvent({ type: 'status', text: 'Up to date.' });
-            cleanup();
             setTimeout(done, 600);
         };
         const onProgress = (p) => {
@@ -108,7 +118,6 @@ function performStartupUpdateCheck(onEvent) {
                 text: isNetwork ? 'No internet — skipping update.' : 'Update check failed.',
                 cls: 'warn',
             });
-            cleanup();
             setTimeout(done, 800);
         };
         electron_updater_1.autoUpdater.on('update-available', onAvailable);
@@ -116,6 +125,12 @@ function performStartupUpdateCheck(onEvent) {
         electron_updater_1.autoUpdater.on('download-progress', onProgress);
         electron_updater_1.autoUpdater.on('update-downloaded', onDownloaded);
         electron_updater_1.autoUpdater.on('error', onError);
+        // Safety timeout — if no event fires within 8s, continue anyway
+        timeoutHandle = setTimeout(() => {
+            onEvent({ type: 'status', text: 'Update check timed out.', cls: 'warn' });
+            done();
+        }, 8000);
+        onEvent({ type: 'status', text: 'Checking for updates…' });
         electron_updater_1.autoUpdater.checkForUpdates().catch((err) => onError(err));
     });
 }

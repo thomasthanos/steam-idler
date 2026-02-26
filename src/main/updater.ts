@@ -43,9 +43,16 @@ export function performStartupUpdateCheck(
   onEvent: (evt: SplashEvent) => void
 ): Promise<void> {
   return new Promise((resolve) => {
-    const done = () => resolve()
+    let finished = false
+    let timeoutHandle: ReturnType<typeof setTimeout> | null = null
 
-    onEvent({ type: 'status', text: 'Checking for updates…' })
+    const done = () => {
+      if (finished) return
+      finished = true
+      if (timeoutHandle) clearTimeout(timeoutHandle)
+      cleanup()
+      resolve()
+    }
 
     const cleanup = () => {
       autoUpdater.removeListener('update-available',     onAvailable)
@@ -56,13 +63,13 @@ export function performStartupUpdateCheck(
     }
 
     const onAvailable = (info: UpdateInfo) => {
+      if (timeoutHandle) clearTimeout(timeoutHandle)
       onEvent({ type: 'status', text: `Downloading v${info.version}…` })
-      autoUpdater.downloadUpdate().catch(() => { cleanup(); done() })
+      autoUpdater.downloadUpdate().catch(() => done())
     }
 
     const onNotAvailable = () => {
       onEvent({ type: 'status', text: 'Up to date.' })
-      cleanup()
       setTimeout(done, 600)
     }
 
@@ -88,7 +95,6 @@ export function performStartupUpdateCheck(
         text: isNetwork ? 'No internet — skipping update.' : 'Update check failed.',
         cls: 'warn',
       })
-      cleanup()
       setTimeout(done, 800)
     }
 
@@ -98,6 +104,13 @@ export function performStartupUpdateCheck(
     autoUpdater.on('update-downloaded',    onDownloaded)
     autoUpdater.on('error',                onError)
 
+    // Safety timeout — if no event fires within 8s, continue anyway
+    timeoutHandle = setTimeout(() => {
+      onEvent({ type: 'status', text: 'Update check timed out.', cls: 'warn' })
+      done()
+    }, 8000)
+
+    onEvent({ type: 'status', text: 'Checking for updates…' })
     autoUpdater.checkForUpdates().catch((err: Error) => onError(err))
   })
 }
