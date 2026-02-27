@@ -75,15 +75,24 @@ function performStartupUpdateCheck(onEvent, preload) {
             electron_updater_1.autoUpdater.removeListener('update-downloaded', onDownloaded);
             electron_updater_1.autoUpdater.removeListener('error', onError);
         };
-        const onAvailable = (info) => {
-            if (timeoutHandle)
+        // Clear the safety timeout as soon as ANY update event fires.
+        // Without this, if the preload takes a while the timeout could fire
+        // mid-preload and call runPreloadThenDone() a second time.
+        const clearSafetyTimeout = () => {
+            if (timeoutHandle) {
                 clearTimeout(timeoutHandle);
+                timeoutHandle = null;
+            }
+        };
+        const onAvailable = (info) => {
+            clearSafetyTimeout();
             onEvent({ type: 'status', text: `Downloading v${info.version}…` });
             // autoDownload = false globally, so we trigger the download manually here
             // (only during the splash flow — background checks require a user click)
             electron_updater_1.autoUpdater.downloadUpdate().catch((err) => onError(err));
         };
         const runPreloadThenDone = () => {
+            clearSafetyTimeout();
             if (preload) {
                 preload(onEvent).catch(() => { }).finally(() => done());
             }

@@ -9,6 +9,9 @@ type SteamClient = Omit<sw.Client, 'init' | 'runCallbacks'>
 let client: SteamClient | null = null
 let currentAppId = 0
 let storedApiKey = ''
+// Set to true once UserStatsReceived has been observed (activate/isActivated
+// work correctly). Used to gate achievement writes without blind time waits.
+let statsReady = false
 
 function send(id: number, ok: boolean, data?: unknown, error?: string) {
   process.stdout.write(JSON.stringify({ id, ok, data, error }) + '\n')
@@ -55,13 +58,73 @@ async function fetchSchema(appId: number, apiKey: string) {
 // ─── Handlers ────────────────────────────────────────────────────────────────
 function handleInit(id: number, appId: number, apiKey?: string) {
   try {
+    console.error(`[worker] INIT appId=${appId}, pid=${process.pid}`)
     process.env['SteamAppId'] = String(appId)
     client = sw.init(appId)
     currentAppId = appId
     if (apiKey) storedApiKey = apiKey
-    startCallbackLoop()
-    send(id, true, { appId })
+    try {
+      const steamId = client.localplayer.getSteamId().steamId64.toString()
+      console.error(`[worker] Steam OK, SteamID=${steamId}`)
+    } catch (e) {
+      console.error(`[worker] localplayer check failed:`, e)
+    }
+
+    // Probe for UserStatsReceived by watching whether isActivated() stops
+    // throwing / starts returning a stable boolean. sw.init() already starts
+    // its own 30 fps runCallbacks interval internally, so we don't need to
+    // pump manually — we just poll the result.
+    //
+    // Detection strategy:
+    //   • Call client.stats.getInt() with a dummy name. Returns null when
+    //     stats haven't arrived AND for genuinely missing stat names. Not
+    //     enough on its own.
+    //   • Call client.achievement.isActivated() with a dummy name. After
+    //     UserStatsReceived fires it returns false (unknown name) without
+    //     throwing. Before that, it may throw or behave erratically in some
+    //     SDK versions. Catching and counting stable-false runs works.
+    //   • Hard timeout of MAX_WAIT_MS: declare ready anyway so callers can
+    //     attempt their operation (they have their own retry loop).
+    statsReady = false
+    const MAX_WAIT_MS = 6000
+    const TICK_MS     = 150
+    const started     = Date.now()
+    let stableCount   = 0   // consecutive stable (non-throw) probe results
+    const STABLE_NEEDED = 3 // need 3 stable ticks in a row ≈ 450 ms stable
+
+    const waitForStats = () => {
+      const elapsed = Date.now() - started
+
+      // Probe: isActivated on a known-invalid name throws before stats are
+      // ready on some games; returns false once ready.
+      let probeOk = false
+      try {
+        client!.achievement.isActivated('__sw_probe__')
+        probeOk = true
+      } catch {
+        probeOk = false
+      }
+
+      if (probeOk) {
+        stableCount++
+      } else {
+        stableCount = 0
+      }
+
+      if (stableCount >= STABLE_NEEDED || elapsed >= MAX_WAIT_MS) {
+        statsReady = true
+        console.error(`[worker] Stats ready after ${elapsed}ms (stable=${stableCount}, timeout=${elapsed >= MAX_WAIT_MS})`)
+        startCallbackLoop()
+        send(id, true, { appId })
+        return
+      }
+
+      setTimeout(waitForStats, TICK_MS)
+    }
+
+    setTimeout(waitForStats, TICK_MS)
   } catch (e: unknown) {
+    console.error(`[worker] INIT failed:`, e)
     send(id, false, undefined, (e as Error).message)
   }
 }
@@ -125,14 +188,73 @@ async function handleGetAchievements(id: number) {
   }
 }
 
-function handleSetAchievement(id: number, apiName: string, unlocked: boolean) {
+// Sentinel returned when activate() persistently returns false, signalling
+// the caller (client.ts) to restart the worker and retry.
+export const STATS_NOT_RECEIVED_SENTINEL = 'STATS_NOT_RECEIVED'
+
+async function handleSetAchievement(id: number, apiName: string, unlocked: boolean) {
+  console.error(`[worker] SET_ACHIEVEMENT: ${apiName} -> unlocked=${unlocked}, client=${!!client}, statsReady=${statsReady}`)
   if (!client) { send(id, false, undefined, 'Not initialised'); return }
   try {
-    if (unlocked) client.achievement.activate(apiName)
-    else client.achievement.clear(apiName)
-    client.stats.store()
-    send(id, true)
+    // Fast-fail pass: if we have 4 consecutive false returns in a row before
+    // any success, UserStatsReceived never arrived for this session. Signal
+    // the caller to restart the worker (fresh RequestCurrentStats) and retry.
+    const FAST_FAIL_ATTEMPTS = 4
+    const RETRY_DELAY        = 250  // ms between attempts
+    const MAX_ATTEMPTS       = 20
+    let attempt = 0
+    let ok = false
+
+    while (attempt < MAX_ATTEMPTS) {
+      ok = unlocked
+        ? client.achievement.activate(apiName)
+        : client.achievement.clear(apiName)
+
+      console.error(`[worker] attempt ${attempt + 1}: ${unlocked ? 'activate' : 'clear'}(${apiName}) = ${ok}`)
+
+      if (ok) break
+
+      attempt++
+
+      // After FAST_FAIL_ATTEMPTS consecutive failures send the sentinel so the
+      // main process can kill+respawn this worker and retry with a fresh stats
+      // request — much faster than grinding through all 20 attempts.
+      if (attempt === FAST_FAIL_ATTEMPTS) {
+        console.error(`[worker] ${FAST_FAIL_ATTEMPTS} failures — sending STATS_NOT_RECEIVED sentinel`)
+        send(id, false, undefined, STATS_NOT_RECEIVED_SENTINEL)
+        return
+      }
+
+      await new Promise(r => setTimeout(r, RETRY_DELAY))
+    }
+
+    if (!ok) {
+      send(id, false, undefined, `Steam rejected the achievement update after ${MAX_ATTEMPTS} attempts. Make sure Steam is running and the game supports achievements.`)
+      return
+    }
+
+    const stored = client.stats.store()
+    console.error(`[worker] stats.store() returned:`, stored)
+
+    // stats.store() queues the write asynchronously — Steam needs additional
+    // runCallbacks() ticks to flush the UserStatsStored callback and actually
+    // persist the data. Without this pump, killing the worker immediately after
+    // (e.g. navigating away) can discard the pending write.
+    const FLUSH_MS   = 600
+    const FLUSH_TICK = 50
+    const flushStart = Date.now()
+    while (Date.now() - flushStart < FLUSH_MS) {
+      await new Promise(r => setTimeout(r, FLUSH_TICK))
+    }
+
+    // Verify the final state from Steamworks so the caller can detect mismatches.
+    let verified: boolean | undefined
+    try { verified = client.achievement.isActivated(apiName) } catch { /* ok */ }
+    console.error(`[worker] post-flush verify isActivated(${apiName}) =`, verified)
+
+    send(id, true, { verified, expected: unlocked })
   } catch (e: unknown) {
+    console.error(`[worker] SET_ACHIEVEMENT error:`, e)
     send(id, false, undefined, (e as Error).message)
   }
 }
@@ -142,7 +264,32 @@ async function handleSetAllAchievements(id: number, unlocked: boolean) {
   if (!storedApiKey) { send(id, false, undefined, 'Steam API key required. Add one in Settings.'); return }
   try {
     const schema = await fetchSchema(currentAppId, storedApiKey)
-    for (const a of schema.achievements) {
+
+    // Pump callbacks first so UserStatsReceived is guaranteed to have fired
+    const MAX_PUMP = 20
+    const PUMP_DELAY = 300
+    let pumped = false
+    for (let i = 0; i < MAX_PUMP; i++) {
+      try { runCallbacks?.() } catch { /* ok */ }
+      // Test with first achievement to see if stats are ready
+      if (schema.achievements.length > 0) {
+        const test = unlocked
+          ? client.achievement.activate(schema.achievements[0].name)
+          : client.achievement.clear(schema.achievements[0].name)
+        if (test) { pumped = true; break }
+      } else {
+        pumped = true; break
+      }
+      await new Promise(r => setTimeout(r, PUMP_DELAY))
+    }
+
+    if (!pumped && schema.achievements.length > 0) {
+      send(id, false, undefined, 'Steam stats not ready. Make sure Steam is running.')
+      return
+    }
+
+    // Apply to rest of achievements (first one already done above)
+    for (const a of schema.achievements.slice(1)) {
       if (unlocked) client.achievement.activate(a.name)
       else client.achievement.clear(a.name)
     }

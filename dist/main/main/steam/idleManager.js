@@ -47,7 +47,10 @@ class IdleManager {
         this.names = new Map();
     }
     get workerPath() {
-        return path.join(__dirname, 'worker.js');
+        // In a packaged app, worker.js is extracted from app.asar into
+        // app.asar.unpacked so it can be spawned as a child process.
+        return path.join(__dirname, 'worker.js')
+            .replace('app.asar' + path.sep, 'app.asar.unpacked' + path.sep);
     }
     startIdle(appId, name) {
         if (this.idlers.has(appId))

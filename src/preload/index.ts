@@ -18,10 +18,10 @@ const steamAPI = {
   getAchievements: (appId: number): Promise<IPCResponse<Achievement[]>> =>
     ipcRenderer.invoke(IPC.GET_ACHIEVEMENTS, appId),
 
-  unlockAchievement: (appId: number, apiName: string): Promise<IPCResponse<void>> =>
+  unlockAchievement: (appId: number, apiName: string): Promise<IPCResponse<{ verified?: boolean; expected?: boolean }>> =>
     ipcRenderer.invoke(IPC.UNLOCK_ACHIEVEMENT, appId, apiName),
 
-  lockAchievement: (appId: number, apiName: string): Promise<IPCResponse<void>> =>
+  lockAchievement: (appId: number, apiName: string): Promise<IPCResponse<{ verified?: boolean; expected?: boolean }>> =>
     ipcRenderer.invoke(IPC.LOCK_ACHIEVEMENT, appId, apiName),
 
   unlockAllAchievements: (appId: number): Promise<IPCResponse<void>> =>

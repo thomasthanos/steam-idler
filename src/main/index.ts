@@ -24,6 +24,30 @@ export const idleManager = new IdleManager()
 
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged
 
+// ─── Production logging ───────────────────────────────────────────────────────
+if (!isDev) {
+  const logFile = path.join(app.getPath('userData'), 'debug.log')
+  try {
+    const logStream = fs.createWriteStream(logFile, { flags: 'a' })
+    const originalLog = console.log
+    const originalError = console.error
+    const originalWarn = console.warn
+    console.log = (...args: unknown[]) => {
+      logStream.write(`[LOG ${new Date().toISOString()}] ${args.join(' ')}\n`)
+      originalLog.apply(console, args)
+    }
+    console.error = (...args: unknown[]) => {
+      logStream.write(`[ERROR ${new Date().toISOString()}] ${args.join(' ')}\n`)
+      originalError.apply(console, args)
+    }
+    console.warn = (...args: unknown[]) => {
+      logStream.write(`[WARN ${new Date().toISOString()}] ${args.join(' ')}\n`)
+      originalWarn.apply(console, args)
+    }
+    console.log(`[startup] App starting v${app.getVersion()}, userData=${app.getPath('userData')}`)
+  } catch { /* ok */ }
+}
+
 
 // ─── Single instance lock ─────────────────────────────────────────────────
 const gotLock = app.requestSingleInstanceLock()
@@ -162,18 +186,22 @@ async function runSplashFlow(onReady: () => void): Promise<void> {
   // Create main window while splash is still visible
   onReady()
 
-  // Close splash once main window has painted (or after a short delay)
+  // Close splash once main window has painted.
+  // Safety fallback: if ready-to-show never fires (e.g. renderer crash during
+  // load), close the splash after 8 s so it doesn't stay open forever.
   const closeSplash = () => {
-    if (!splash.isDestroyed()) {
-      splash.close()
-    }
+    if (!splash.isDestroyed()) splash.close()
   }
+
+  const splashFallback = setTimeout(closeSplash, 8000)
 
   if (mainWindow) {
     mainWindow.once('ready-to-show', () => {
+      clearTimeout(splashFallback)
       setTimeout(closeSplash, 200)
     })
   } else {
+    clearTimeout(splashFallback)
     setTimeout(closeSplash, 1000)
   }
 }

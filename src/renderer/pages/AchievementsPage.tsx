@@ -150,24 +150,28 @@ export default function AchievementsPage() {
     window.steam.sendNotification(title, body, !settings.notificationSound).catch(() => {})
   }
 
-  // Kill the Steam worker when navigating away from the achievements page.
-  // We use a ref+timeout guard so React StrictMode double-mount in dev
-  // doesn't kill the worker before GET_ACHIEVEMENTS has a chance to run.
+  // Stop the worker when the user navigates away from the achievements page
+  // (back to library, settings, idle, etc.).
+  //
+  // Guards:
+  //   • Uses a ref+timer so React StrictMode’s double-mount in dev cancels the
+  //     first cleanup before it fires, keeping the worker alive.
+  //   • Passes appId to stopGame so a delayed cleanup from game A cannot kill
+  //     the worker that was just spawned for game B if the user navigated there
+  //     quickly.
+  //   • 2 s delay: enough for stats.store() to flush (~600 ms) plus margin.
+  //     The 25 s kill-timer bug is fixed so this delay is now safe.
   const stopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {
-    // Cancel any pending stop from a previous StrictMode cycle
     if (stopTimerRef.current) {
       clearTimeout(stopTimerRef.current)
       stopTimerRef.current = null
     }
     return () => {
-      // Delay slightly — if StrictMode remounts immediately this gets cancelled
       stopTimerRef.current = setTimeout(() => {
-        // Pass the appId so the main process only kills this specific worker.
-        // Without it, a delayed cleanup from game A could kill the freshly-
-        // spawned worker for game B if the user navigated there quickly.
+        stopTimerRef.current = null
         window.steam.stopGame(numAppId).catch(() => {})
-      }, 300)
+      }, 2000)
     }
   }, [])
 
@@ -229,14 +233,32 @@ export default function AchievementsPage() {
         ? await window.steam.lockAchievement(numAppId, ach.apiName)
         : await window.steam.unlockAchievement(numAppId, ach.apiName)
       if (res.success) {
+        const wasUnlocked = ach.unlocked
+        const wantUnlocked = !wasUnlocked
+
+        // Worker returns { verified, expected } after flushing stats.store().
+        // If the verified state doesn't match what we asked for, warn the user
+        // but still optimistically update the UI (Steam cache may be slightly
+        // behind the actual state on slow machines).
+        const payload = res.data
+        const verifyMismatch =
+          payload?.verified !== undefined && payload.verified !== wantUnlocked
+
         setAchievements(prev => prev.map(a =>
           a.apiName === ach.apiName
-            ? { ...a, unlocked: !a.unlocked, unlockedAt: !a.unlocked ? Date.now() / 1000 : undefined }
+            ? { ...a, unlocked: wantUnlocked, unlockedAt: wantUnlocked ? Date.now() / 1000 : undefined }
             : a
         ))
-        const wasUnlocked = ach.unlocked
-        toast.success(wasUnlocked ? `Locked: ${ach.displayName}` : `🏆 Unlocked: ${ach.displayName}`)
-        if (!wasUnlocked) notify('🏆 Achievement Unlocked!', ach.displayName)
+
+        if (verifyMismatch) {
+          toast.error(
+            `Steam reported the change but verification shows the achievement is still ${wasUnlocked ? 'unlocked' : 'locked'}. Try refreshing.`,
+            { duration: 6000 }
+          )
+        } else {
+          toast.success(wasUnlocked ? `Locked: ${ach.displayName}` : `🏆 Unlocked: ${ach.displayName}`)
+          if (!wasUnlocked) notify('🏆 Achievement Unlocked!', ach.displayName)
+        }
       } else {
         toast.error(res.error ?? 'Failed to update achievement')
       }

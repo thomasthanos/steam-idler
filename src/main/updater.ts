@@ -84,8 +84,15 @@ export function performStartupUpdateCheck(
       autoUpdater.removeListener('error',                onError)
     }
 
+    // Clear the safety timeout as soon as ANY update event fires.
+    // Without this, if the preload takes a while the timeout could fire
+    // mid-preload and call runPreloadThenDone() a second time.
+    const clearSafetyTimeout = () => {
+      if (timeoutHandle) { clearTimeout(timeoutHandle); timeoutHandle = null }
+    }
+
     const onAvailable = (info: UpdateInfo) => {
-      if (timeoutHandle) clearTimeout(timeoutHandle)
+      clearSafetyTimeout()
       onEvent({ type: 'status', text: `Downloading v${info.version}…` })
       // autoDownload = false globally, so we trigger the download manually here
       // (only during the splash flow — background checks require a user click)
@@ -93,6 +100,7 @@ export function performStartupUpdateCheck(
     }
 
     const runPreloadThenDone = () => {
+      clearSafetyTimeout()
       if (preload) {
         preload(onEvent).catch(() => {}).finally(() => done())
       } else {

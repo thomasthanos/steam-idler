@@ -12,7 +12,10 @@ export class IdleManager {
   private names  = new Map<number, string>()
 
   private get workerPath(): string {
+    // In a packaged app, worker.js is extracted from app.asar into
+    // app.asar.unpacked so it can be spawned as a child process.
     return path.join(__dirname, 'worker.js')
+      .replace('app.asar' + path.sep, 'app.asar.unpacked' + path.sep)
   }
 
   startIdle(appId: number, name?: string): void {

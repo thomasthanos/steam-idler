@@ -57,6 +57,30 @@ let activateListenerRegistered = false;
 const steamClient = new client_1.SteamClient();
 exports.idleManager = new idleManager_1.IdleManager();
 const isDev = process.env.NODE_ENV === 'development' || !electron_1.app.isPackaged;
+// ─── Production logging ───────────────────────────────────────────────────────
+if (!isDev) {
+    const logFile = path.join(electron_1.app.getPath('userData'), 'debug.log');
+    try {
+        const logStream = fs.createWriteStream(logFile, { flags: 'a' });
+        const originalLog = console.log;
+        const originalError = console.error;
+        const originalWarn = console.warn;
+        console.log = (...args) => {
+            logStream.write(`[LOG ${new Date().toISOString()}] ${args.join(' ')}\n`);
+            originalLog.apply(console, args);
+        };
+        console.error = (...args) => {
+            logStream.write(`[ERROR ${new Date().toISOString()}] ${args.join(' ')}\n`);
+            originalError.apply(console, args);
+        };
+        console.warn = (...args) => {
+            logStream.write(`[WARN ${new Date().toISOString()}] ${args.join(' ')}\n`);
+            originalWarn.apply(console, args);
+        };
+        console.log(`[startup] App starting v${electron_1.app.getVersion()}, userData=${electron_1.app.getPath('userData')}`);
+    }
+    catch { /* ok */ }
+}
 // ─── Single instance lock ─────────────────────────────────────────────────
 const gotLock = electron_1.app.requestSingleInstanceLock();
 if (!gotLock) {
@@ -188,18 +212,22 @@ async function runSplashFlow(onReady) {
     call('_hideSpinner');
     // Create main window while splash is still visible
     onReady();
-    // Close splash once main window has painted (or after a short delay)
+    // Close splash once main window has painted.
+    // Safety fallback: if ready-to-show never fires (e.g. renderer crash during
+    // load), close the splash after 8 s so it doesn't stay open forever.
     const closeSplash = () => {
-        if (!splash.isDestroyed()) {
+        if (!splash.isDestroyed())
             splash.close();
-        }
     };
+    const splashFallback = setTimeout(closeSplash, 8000);
     if (mainWindow) {
         mainWindow.once('ready-to-show', () => {
+            clearTimeout(splashFallback);
             setTimeout(closeSplash, 200);
         });
     }
     else {
+        clearTimeout(splashFallback);
         setTimeout(closeSplash, 1000);
     }
 }

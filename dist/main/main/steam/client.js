@@ -106,7 +106,11 @@ class WorkerBridge {
         this.initPromise = null;
     }
     get workerPath() {
-        return path.join(__dirname, 'worker.js');
+        // In a packaged app, worker.js is extracted from app.asar into
+        // app.asar.unpacked so it can be spawned as a child process.
+        // In dev, __dirname does not contain 'app.asar' so the replace is a no-op.
+        return path.join(__dirname, 'worker.js')
+            .replace('app.asar' + path.sep, 'app.asar.unpacked' + path.sep);
     }
     async ensure(appId) {
         // If an init is already in-flight, wait for it to complete before checking
@@ -176,17 +180,32 @@ class WorkerBridge {
                 this.pending.clear();
             }
         });
-        const INIT_TIMEOUT_MS = 20000;
-        await Promise.race([
-            this.send({ type: 'INIT', appId, apiKey: apiKey || undefined }, proc),
-            new Promise((_, reject) => setTimeout(() => {
-                try {
-                    proc.kill();
-                }
-                catch { /* ok */ }
-                reject(new Error('Steam initialization timed out. Make sure Steam is running.'));
-            }, INIT_TIMEOUT_MS)),
-        ]);
+        const INIT_TIMEOUT_MS = 25000;
+        let initTimeoutHandle = null;
+        try {
+            await Promise.race([
+                this.send({ type: 'INIT', appId, apiKey: apiKey || undefined }, proc),
+                new Promise((_, reject) => {
+                    initTimeoutHandle = setTimeout(() => {
+                        initTimeoutHandle = null;
+                        try {
+                            proc.kill();
+                        }
+                        catch { /* ok */ }
+                        reject(new Error('Steam initialization timed out. Make sure Steam is running.'));
+                    }, INIT_TIMEOUT_MS);
+                }),
+            ]);
+        }
+        finally {
+            // CRITICAL: always clear the kill-timer when INIT finishes — whether it
+            // succeeded or failed. Without this, the setTimeout fires 25 s after a
+            // *successful* INIT and sends SIGTERM to an otherwise healthy worker.
+            if (initTimeoutHandle !== null) {
+                clearTimeout(initTimeoutHandle);
+                initTimeoutHandle = null;
+            }
+        }
     }
     send(msg, targetProc) {
         return new Promise((resolve, reject) => {
@@ -465,7 +484,31 @@ class SteamClient {
     }
     async setAchievement(appId, apiName, unlocked) {
         await worker.ensure(appId);
-        await worker.send({ type: 'SET_ACHIEVEMENT', apiName, unlocked });
+        let result;
+        try {
+            result = await worker.send({ type: 'SET_ACHIEVEMENT', apiName, unlocked });
+        }
+        catch (firstErr) {
+            const msg = firstErr.message ?? '';
+            // The worker sends STATS_NOT_RECEIVED_SENTINEL when activate() returns
+            // false on every attempt, meaning UserStatsReceived never fired for this
+            // session (e.g. Steam didn't ack the initial RequestCurrentStats). Kill
+            // the worker and respawn it — the fresh init triggers a new stats request
+            // which typically succeeds on the second try.
+            if (msg === 'STATS_NOT_RECEIVED') {
+                console.error('[client] Worker reported stats not received — restarting worker for retry');
+                await worker.kill();
+                // Brief pause lets Steam fully deregister the previous session before
+                // we open a new one for the same appId.
+                await new Promise(r => setTimeout(r, 800));
+                await worker.ensure(appId);
+                result = await worker.send({ type: 'SET_ACHIEVEMENT', apiName, unlocked });
+            }
+            else {
+                throw firstErr;
+            }
+        }
+        return (result ?? {});
     }
     async setAllAchievements(appId, unlocked) {
         await worker.ensure(appId);

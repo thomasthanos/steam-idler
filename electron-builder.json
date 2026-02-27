@@ -11,6 +11,10 @@
     "resources/**/*",
     "package.json"
   ],
+  "asarUnpack": [
+    "**/steam/worker.js",
+    "node_modules/steamworks.js/**"
+  ],
   "extraMetadata": {
     "main": "dist/main/main/index.js"
   },

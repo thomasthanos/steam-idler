@@ -131,7 +131,7 @@ export default function AutoIdlePage() {
   const startAll = async () => {
     const toStart = savedGames.filter(g => !idlingIds.includes(g.appId))
     for (const game of toStart) {
-      await startIdle(game)
+      try { await startIdle(game) } catch { /* continue with next game */ }
       await new Promise(r => setTimeout(r, 300))
     }
   }

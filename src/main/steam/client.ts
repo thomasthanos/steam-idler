@@ -92,7 +92,11 @@ class WorkerBridge {
   private initPromise: Promise<void> | null = null
 
   private get workerPath(): string {
+    // In a packaged app, worker.js is extracted from app.asar into
+    // app.asar.unpacked so it can be spawned as a child process.
+    // In dev, __dirname does not contain 'app.asar' so the replace is a no-op.
     return path.join(__dirname, 'worker.js')
+      .replace('app.asar' + path.sep, 'app.asar.unpacked' + path.sep)
   }
 
   async ensure(appId: number): Promise<void> {
@@ -165,16 +169,28 @@ class WorkerBridge {
       }
     })
 
-    const INIT_TIMEOUT_MS = 20_000
-    await Promise.race([
-      this.send({ type: 'INIT', appId, apiKey: apiKey || undefined }, proc),
-      new Promise<never>((_, reject) =>
-        setTimeout(() => {
-          try { proc.kill() } catch { /* ok */ }
-          reject(new Error('Steam initialization timed out. Make sure Steam is running.'))
-        }, INIT_TIMEOUT_MS)
-      ),
-    ])
+    const INIT_TIMEOUT_MS = 25_000
+    let initTimeoutHandle: ReturnType<typeof setTimeout> | null = null
+    try {
+      await Promise.race([
+        this.send({ type: 'INIT', appId, apiKey: apiKey || undefined }, proc),
+        new Promise<never>((_, reject) => {
+          initTimeoutHandle = setTimeout(() => {
+            initTimeoutHandle = null
+            try { proc.kill() } catch { /* ok */ }
+            reject(new Error('Steam initialization timed out. Make sure Steam is running.'))
+          }, INIT_TIMEOUT_MS)
+        }),
+      ])
+    } finally {
+      // CRITICAL: always clear the kill-timer when INIT finishes — whether it
+      // succeeded or failed. Without this, the setTimeout fires 25 s after a
+      // *successful* INIT and sends SIGTERM to an otherwise healthy worker.
+      if (initTimeoutHandle !== null) {
+        clearTimeout(initTimeoutHandle)
+        initTimeoutHandle = null
+      }
+    }
   }
 
   send(msg: Omit<{ id: number; type: string;[k: string]: unknown }, 'id'>, targetProc?: ChildProcess): Promise<unknown> {
@@ -485,9 +501,31 @@ export class SteamClient {
     return worker.send({ type: 'GET_ACHIEVEMENTS' }) as Promise<Achievement[]>
   }
 
-  async setAchievement(appId: number, apiName: string, unlocked: boolean): Promise<void> {
+  async setAchievement(appId: number, apiName: string, unlocked: boolean): Promise<{ verified?: boolean; expected?: boolean }> {
     await worker.ensure(appId)
-    await worker.send({ type: 'SET_ACHIEVEMENT', apiName, unlocked })
+    let result: unknown
+    try {
+      result = await worker.send({ type: 'SET_ACHIEVEMENT', apiName, unlocked })
+    } catch (firstErr: unknown) {
+      const msg = (firstErr as Error).message ?? ''
+      // The worker sends STATS_NOT_RECEIVED_SENTINEL when activate() returns
+      // false on every attempt, meaning UserStatsReceived never fired for this
+      // session (e.g. Steam didn't ack the initial RequestCurrentStats). Kill
+      // the worker and respawn it — the fresh init triggers a new stats request
+      // which typically succeeds on the second try.
+      if (msg === 'STATS_NOT_RECEIVED') {
+        console.error('[client] Worker reported stats not received — restarting worker for retry')
+        await worker.kill()
+        // Brief pause lets Steam fully deregister the previous session before
+        // we open a new one for the same appId.
+        await new Promise(r => setTimeout(r, 800))
+        await worker.ensure(appId)
+        result = await worker.send({ type: 'SET_ACHIEVEMENT', apiName, unlocked })
+      } else {
+        throw firstErr
+      }
+    }
+    return (result ?? {}) as { verified?: boolean; expected?: boolean }
   }
 
   async setAllAchievements(appId: number, unlocked: boolean): Promise<void> {
