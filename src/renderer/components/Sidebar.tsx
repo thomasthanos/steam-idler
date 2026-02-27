@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import { Home, Gamepad2, Settings, Wifi, WifiOff, Trophy, Clock, ChevronRight } from 'lucide-react'
+import { Home, Gamepad2, Settings, Wifi, WifiOff, Trophy, ChevronRight, Package } from 'lucide-react'
 import { useAppContext } from '../hooks/useAppContext'
 import GameImage from './GameImage'
 import clsx from 'clsx'
@@ -53,9 +53,10 @@ function AutoIdleIcon({ size = 16, color = 'currentColor' }: { size?: number; co
 // ── Nav data ────────────────────────────────────────────────────────────────
 
 const navItems = [
-  { to: '/home',     icon: Home,     label: 'Home',    desc: 'Deals & promos' },
-  { to: '/games',    icon: Gamepad2, label: 'Library', desc: 'All games'      },
-  { to: '/settings', icon: Settings, label: 'Settings',desc: 'Configure'      },
+  { to: '/home', icon: Home, label: 'Home', desc: 'Deals & promos' },
+  { to: '/games', icon: Gamepad2, label: 'Library', desc: 'All games' },
+  { to: '/portfolio', icon: Package, label: 'Portfolio', desc: 'More apps' },
+  { to: '/settings', icon: Settings, label: 'Settings', desc: 'Configure' },
 ]
 
 // ── Component ───────────────────────────────────────────────────────────────
@@ -69,7 +70,7 @@ export default function Sidebar() {
     const refresh = () => {
       window.steam.getIdleStatus().then(res => {
         if (res.success && res.data) setIdlingCount(res.data.length)
-      }).catch(() => {})
+      }).catch(() => { })
     }
     refresh()
     const t = setInterval(refresh, 5000)
@@ -81,9 +82,9 @@ export default function Sidebar() {
     .sort((a, b) => (b.lastPlayed ?? 0) - (a.lastPlayed ?? 0))
     .slice(0, 3)
 
-  const totalAchs    = games.reduce((s, g) => s + g.achievementCount, 0)
+  const totalAchs = games.reduce((s, g) => s + g.achievementCount, 0)
   const unlockedAchs = games.reduce((s, g) => s + g.achievementsUnlocked, 0)
-  const achPct       = totalAchs > 0 ? Math.round((unlockedAchs / totalAchs) * 100) : 0
+  const achPct = totalAchs > 0 ? Math.round((unlockedAchs / totalAchs) * 100) : 0
 
   // ── Shared nav link renderer ───────────────────────────────────────────
   function NavItem({
@@ -310,12 +311,12 @@ export default function Sidebar() {
           className="flex items-center gap-2 text-xs rounded-xl px-3 py-2 transition-all duration-300"
           style={{
             background: steamRunning ? 'rgba(34,197,94,0.07)' : 'rgba(239,68,68,0.07)',
-            color:      steamRunning ? 'var(--green)'          : 'var(--red)',
-            border:    `1px solid ${steamRunning ? 'rgba(34,197,94,0.18)' : 'rgba(239,68,68,0.18)'}`,
+            color: steamRunning ? 'var(--green)' : 'var(--red)',
+            border: `1px solid ${steamRunning ? 'rgba(34,197,94,0.18)' : 'rgba(239,68,68,0.18)'}`,
           }}
         >
           {steamRunning
-            ? <><Wifi    className="w-3 h-3 shrink-0" /><span>Steam connected</span></>
+            ? <><Wifi className="w-3 h-3 shrink-0" /><span>Steam connected</span></>
             : <><WifiOff className="w-3 h-3 shrink-0" /><span>Steam offline</span></>
           }
           {steamRunning && (

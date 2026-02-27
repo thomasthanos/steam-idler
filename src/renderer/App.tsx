@@ -10,8 +10,10 @@ import AchievementsPage from './pages/AchievementsPage'
 import SettingsPage from './pages/SettingsPage'
 import IdlePage from './pages/IdlePage'
 import AutoIdlePage from './pages/AutoIdlePage'
+import PortfolioPage from './pages/PortfolioPage'
 import { AppProvider, useAppContext } from './hooks/useAppContext'
 import { useEffect } from 'react'
+
 
 function AppShell() {
   useTheme()
@@ -37,13 +39,14 @@ function AppShell() {
         <Sidebar />
         <main className="flex-1 overflow-hidden relative" style={{ background: 'var(--bg)' }}>
           <Routes>
-            <Route path="/"                    element={<Navigate to="/home" replace />} />
-            <Route path="/home"                element={<HomePage />} />
-            <Route path="/games"               element={<GamesPage />} />
+            <Route path="/" element={<Navigate to="/home" replace />} />
+            <Route path="/home" element={<HomePage />} />
+            <Route path="/games" element={<GamesPage />} />
             <Route path="/achievements/:appId" element={<AchievementsPage />} />
-            <Route path="/settings"            element={<SettingsPage />} />
-            <Route path="/idle"                element={<IdlePage />} />
-            <Route path="/auto-idle"           element={<AutoIdlePage />} />
+            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/idle" element={<IdlePage />} />
+            <Route path="/auto-idle" element={<AutoIdlePage />} />
+            <Route path="/portfolio" element={<PortfolioPage />} />
           </Routes>
         </main>
       </div>
@@ -61,7 +64,7 @@ function AppShell() {
             padding: '10px 14px',
           },
           success: { iconTheme: { primary: 'var(--green)', secondary: 'var(--card)' } },
-          error:   { iconTheme: { primary: 'var(--red)',   secondary: 'var(--card)' } },
+          error: { iconTheme: { primary: 'var(--red)', secondary: 'var(--card)' } },
         }}
       />
     </div>
