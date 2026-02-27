@@ -1,8 +1,8 @@
-import { app, ipcMain, Notification } from 'electron'
+import { app, ipcMain, Notification, BrowserWindow, shell } from 'electron'
 import * as path from 'path'
 import * as fs from 'fs'
 import axios from 'axios'
-import { IPC, IPCResponse, AppSettings, IdleGame, FeaturedGame } from '../../shared/types'
+import { IPC, IPCResponse, AppSettings, IdleGame, FeaturedGame, PartnerAppRelease, PartnerAppDownloadProgress } from '../../shared/types'
 import { SteamClient } from '../steam/client'
 import { IdleManager } from '../steam/idleManager'
 import { getStore } from '../store'
@@ -255,6 +255,99 @@ export function setupIpcHandlers(steam: SteamClient, idle: IdleManager): void {
       })
       return { success: true, data: enabled }
     } catch (e: any) {
+      return { success: false, error: e.message }
+    }
+  })
+
+  // ── Partner Apps ──────────────────────────────────────────────────────────
+
+  const PARTNER_APPS: Array<{ key: string; owner: string; repo: string }> = [
+    { key: 'myle', owner: 'thomasthanos', repo: 'Make_Your_Life_Easier.A.E' },
+    { key: 'gbr',  owner: 'thomasthanos', repo: 'Github-Build-Release' },
+  ]
+
+  // Fetch latest release info for both partner apps from GitHub API
+  ipcMain.handle(IPC.GET_PARTNER_APP_RELEASES, async (): Promise<IPCResponse<PartnerAppRelease[]>> => {
+    try {
+      const results = await Promise.all(
+        PARTNER_APPS.map(async ({ key, owner, repo }) => {
+          const res = await axios.get(
+            `https://api.github.com/repos/${owner}/${repo}/releases/latest`,
+            { timeout: 8000, headers: { Accept: 'application/vnd.github+json' } }
+          )
+          const release = res.data
+          const asset = (release.assets as any[]).find((a: any) =>
+            (a.name as string).endsWith('.exe')
+          )
+          if (!asset) throw new Error(`No .exe asset found in ${repo} latest release`)
+          const version: string = (release.tag_name as string).replace(/^v/, '')
+          return {
+            key,
+            version,
+            downloadUrl: asset.browser_download_url as string,
+            fileName: asset.name as string,
+            sizeBytes: asset.size as number,
+          } satisfies PartnerAppRelease
+        })
+      )
+      return { success: true, data: results }
+    } catch (e: any) {
+      return { success: false, error: e.message }
+    }
+  })
+
+  // Download a partner app installer to the user's Downloads folder
+  ipcMain.handle(IPC.DOWNLOAD_PARTNER_APP, async (_e, key: string, url: string, fileName: string): Promise<IPCResponse<void>> => {
+    const pushProgress = (p: PartnerAppDownloadProgress) => {
+      for (const win of BrowserWindow.getAllWindows()) {
+        if (!win.isDestroyed()) win.webContents.send(IPC.PARTNER_APP_DOWNLOAD_PROGRESS, p)
+      }
+    }
+
+    const destPath = path.join(app.getPath('downloads'), fileName)
+
+    try {
+      const res = await axios.get(url, {
+        responseType: 'stream',
+        timeout: 0,
+        headers: { Accept: 'application/octet-stream' },
+        maxRedirects: 5,
+      })
+
+      const totalBytes = parseInt(res.headers['content-length'] ?? '0', 10)
+      let downloaded = 0
+      let lastPercent = -1
+
+      const writer = fs.createWriteStream(destPath)
+
+      res.data.on('data', (chunk: Buffer) => {
+        downloaded += chunk.length
+        if (totalBytes > 0) {
+          const pct = Math.round((downloaded / totalBytes) * 100)
+          if (pct !== lastPercent) {
+            lastPercent = pct
+            pushProgress({ key, percent: pct, done: false })
+          }
+        }
+      })
+
+      await new Promise<void>((resolve, reject) => {
+        res.data.pipe(writer)
+        // Use 'close' (not 'finish') — 'close' fires after the OS releases the file handle
+        writer.on('close', resolve)
+        writer.on('error', reject)
+        res.data.on('error', reject)
+      })
+
+      pushProgress({ key, percent: 100, done: true, filePath: destPath })
+      // Small grace period to ensure Windows fully releases the handle before launching
+      await new Promise(r => setTimeout(r, 300))
+      await shell.openPath(destPath)
+
+      return { success: true }
+    } catch (e: any) {
+      try { if (fs.existsSync(destPath)) fs.unlinkSync(destPath) } catch {}
+      pushProgress({ key, percent: 0, done: true, error: e.message })
       return { success: false, error: e.message }
     }
   })

@@ -42,6 +42,10 @@ exports.IPC = {
     UPDATER_INSTALL: 'updater:install',
     UPDATER_RESTART: 'updater:restart', // quit & install downloaded update
     UPDATER_STATUS: 'updater:status', // push from main → renderer
+    // Partner apps
+    GET_PARTNER_APP_RELEASES: 'partner:get-releases',
+    DOWNLOAD_PARTNER_APP: 'partner:download',
+    PARTNER_APP_DOWNLOAD_PROGRESS: 'partner:download-progress', // push main → renderer
 };
 exports.DEFAULT_SETTINGS = {
     theme: 'dark',

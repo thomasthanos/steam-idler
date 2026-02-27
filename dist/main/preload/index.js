@@ -45,6 +45,14 @@ const steamAPI = {
     // Autostart
     getAutostart: () => electron_1.ipcRenderer.invoke(types_1.IPC.AUTOSTART_GET),
     setAutostart: (enabled) => electron_1.ipcRenderer.invoke(types_1.IPC.AUTOSTART_SET, enabled),
+    // Partner apps
+    getPartnerAppReleases: () => electron_1.ipcRenderer.invoke(types_1.IPC.GET_PARTNER_APP_RELEASES),
+    downloadPartnerApp: (key, url, fileName) => electron_1.ipcRenderer.invoke(types_1.IPC.DOWNLOAD_PARTNER_APP, key, url, fileName),
+    onPartnerAppDownloadProgress: (cb) => {
+        const handler = (_, p) => cb(p);
+        electron_1.ipcRenderer.on(types_1.IPC.PARTNER_APP_DOWNLOAD_PROGRESS, handler);
+        return () => electron_1.ipcRenderer.removeListener(types_1.IPC.PARTNER_APP_DOWNLOAD_PROGRESS, handler);
+    },
     // Theme listener
     onThemeChange: (cb) => {
         const handler = (_event, theme) => cb(theme);

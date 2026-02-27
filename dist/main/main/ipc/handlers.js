@@ -265,4 +265,86 @@ function setupIpcHandlers(steam, idle) {
             return { success: false, error: e.message };
         }
     });
+    // ── Partner Apps ──────────────────────────────────────────────────────────
+    const PARTNER_APPS = [
+        { key: 'myle', owner: 'thomasthanos', repo: 'Make_Your_Life_Easier.A.E' },
+        { key: 'gbr', owner: 'thomasthanos', repo: 'Github-Build-Release' },
+    ];
+    // Fetch latest release info for both partner apps from GitHub API
+    electron_1.ipcMain.handle(types_1.IPC.GET_PARTNER_APP_RELEASES, async () => {
+        try {
+            const results = await Promise.all(PARTNER_APPS.map(async ({ key, owner, repo }) => {
+                const res = await axios_1.default.get(`https://api.github.com/repos/${owner}/${repo}/releases/latest`, { timeout: 8000, headers: { Accept: 'application/vnd.github+json' } });
+                const release = res.data;
+                const asset = release.assets.find((a) => a.name.endsWith('.exe'));
+                if (!asset)
+                    throw new Error(`No .exe asset found in ${repo} latest release`);
+                const version = release.tag_name.replace(/^v/, '');
+                return {
+                    key,
+                    version,
+                    downloadUrl: asset.browser_download_url,
+                    fileName: asset.name,
+                    sizeBytes: asset.size,
+                };
+            }));
+            return { success: true, data: results };
+        }
+        catch (e) {
+            return { success: false, error: e.message };
+        }
+    });
+    // Download a partner app installer to the user's Downloads folder
+    electron_1.ipcMain.handle(types_1.IPC.DOWNLOAD_PARTNER_APP, async (_e, key, url, fileName) => {
+        const pushProgress = (p) => {
+            for (const win of electron_1.BrowserWindow.getAllWindows()) {
+                if (!win.isDestroyed())
+                    win.webContents.send(types_1.IPC.PARTNER_APP_DOWNLOAD_PROGRESS, p);
+            }
+        };
+        const destPath = path.join(electron_1.app.getPath('downloads'), fileName);
+        try {
+            const res = await axios_1.default.get(url, {
+                responseType: 'stream',
+                timeout: 0,
+                headers: { Accept: 'application/octet-stream' },
+                maxRedirects: 5,
+            });
+            const totalBytes = parseInt(res.headers['content-length'] ?? '0', 10);
+            let downloaded = 0;
+            let lastPercent = -1;
+            const writer = fs.createWriteStream(destPath);
+            res.data.on('data', (chunk) => {
+                downloaded += chunk.length;
+                if (totalBytes > 0) {
+                    const pct = Math.round((downloaded / totalBytes) * 100);
+                    if (pct !== lastPercent) {
+                        lastPercent = pct;
+                        pushProgress({ key, percent: pct, done: false });
+                    }
+                }
+            });
+            await new Promise((resolve, reject) => {
+                res.data.pipe(writer);
+                // Use 'close' (not 'finish') — 'close' fires after the OS releases the file handle
+                writer.on('close', resolve);
+                writer.on('error', reject);
+                res.data.on('error', reject);
+            });
+            pushProgress({ key, percent: 100, done: true, filePath: destPath });
+            // Small grace period to ensure Windows fully releases the handle before launching
+            await new Promise(r => setTimeout(r, 300));
+            await electron_1.shell.openPath(destPath);
+            return { success: true };
+        }
+        catch (e) {
+            try {
+                if (fs.existsSync(destPath))
+                    fs.unlinkSync(destPath);
+            }
+            catch { }
+            pushProgress({ key, percent: 0, done: true, error: e.message });
+            return { success: false, error: e.message };
+        }
+    });
 }

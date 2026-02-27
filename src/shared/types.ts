@@ -109,6 +109,11 @@ export const IPC = {
   UPDATER_INSTALL:  'updater:install',
   UPDATER_RESTART:  'updater:restart',  // quit & install downloaded update
   UPDATER_STATUS:   'updater:status',   // push from main → renderer
+
+  // Partner apps
+  GET_PARTNER_APP_RELEASES:      'partner:get-releases',
+  DOWNLOAD_PARTNER_APP:          'partner:download',
+  PARTNER_APP_DOWNLOAD_PROGRESS: 'partner:download-progress', // push main → renderer
 } as const
 
 // ─── Updater ─────────────────────────────────────────────────────────────────────
@@ -142,6 +147,23 @@ export interface AppSettings {
   autoIdleGames: IdleGame[]
   notificationsEnabled: boolean
   notificationSound: boolean
+}
+
+// ─── Partner Apps ────────────────────────────────────────────────────────────
+export interface PartnerAppRelease {
+  key: string
+  version: string
+  downloadUrl: string
+  fileName: string
+  sizeBytes: number
+}
+
+export interface PartnerAppDownloadProgress {
+  key: string
+  percent: number     // 0-100
+  done: boolean
+  error?: string
+  filePath?: string   // set when done=true
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {

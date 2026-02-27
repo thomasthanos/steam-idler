@@ -91,6 +91,19 @@ const steamAPI = {
   setAutostart: (enabled: boolean): Promise<IPCResponse<boolean>> =>
     ipcRenderer.invoke(IPC.AUTOSTART_SET, enabled),
 
+  // Partner apps
+  getPartnerAppReleases: (): Promise<IPCResponse<import('../shared/types').PartnerAppRelease[]>> =>
+    ipcRenderer.invoke(IPC.GET_PARTNER_APP_RELEASES),
+
+  downloadPartnerApp: (key: string, url: string, fileName: string): Promise<IPCResponse<void>> =>
+    ipcRenderer.invoke(IPC.DOWNLOAD_PARTNER_APP, key, url, fileName),
+
+  onPartnerAppDownloadProgress: (cb: (p: import('../shared/types').PartnerAppDownloadProgress) => void) => {
+    const handler = (_: unknown, p: import('../shared/types').PartnerAppDownloadProgress) => cb(p)
+    ipcRenderer.on(IPC.PARTNER_APP_DOWNLOAD_PROGRESS, handler)
+    return () => ipcRenderer.removeListener(IPC.PARTNER_APP_DOWNLOAD_PROGRESS, handler)
+  },
+
   // Theme listener
   onThemeChange: (cb: (theme: 'dark' | 'light') => void) => {
     const handler = (_event: Electron.IpcRendererEvent, theme: 'dark' | 'light') => cb(theme)
