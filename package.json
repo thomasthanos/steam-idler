@@ -5,9 +5,9 @@
   "author": "ThomasThanos",
   "main": "dist/main/main/index.js",
   "scripts": {
-    "dev": "tsc -p tsconfig.main.json && esbuild src/main/steam/worker.ts --bundle --platform=node --target=node18 --external:steamworks.js --outfile=dist/main/main/steam/worker.js && concurrently \"tsc -p tsconfig.main.json --watch\" \"esbuild src/main/steam/worker.ts --bundle --platform=node --target=node18 --external:steamworks.js --outfile=dist/main/main/steam/worker.js --watch\" \"vite\" \"wait-on http://localhost:3000 && electron dist/main/main/index.js\"",
-    "build": "tsc -p tsconfig.main.json && esbuild src/main/steam/worker.ts --bundle --platform=node --target=node18 --external:steamworks.js --outfile=dist/main/main/steam/worker.js && vite build",
-    "release": "tsc -p tsconfig.main.json && esbuild src/main/steam/worker.ts --bundle --platform=node --target=node18 --external:steamworks.js --outfile=dist/main/main/steam/worker.js && vite build && electron-builder --publish always"
+    "dev": "node -e \"console.clear()\" && tsc -p tsconfig.main.json && esbuild src/main/steam/worker.ts --bundle --platform=node --target=node18 --external:steamworks.js --outfile=dist/main/main/steam/worker.js && concurrently \"tsc -p tsconfig.main.json --watch\" \"esbuild src/main/steam/worker.ts --bundle --platform=node --target=node18 --external:steamworks.js --outfile=dist/main/main/steam/worker.js --watch\" \"vite\" \"wait-on http://localhost:3000 && electron dist/main/main/index.js\"",
+    "build": "node -e \"console.clear()\" && tsc -p tsconfig.main.json && esbuild src/main/steam/worker.ts --bundle --platform=node --target=node18 --external:steamworks.js --outfile=dist/main/main/steam/worker.js && vite build",
+    "release": "node -e \"console.clear()\" && tsc -p tsconfig.main.json && esbuild src/main/steam/worker.ts --bundle --platform=node --target=node18 --external:steamworks.js --outfile=dist/main/main/steam/worker.js && vite build && electron-builder --publish always"
   },
   "dependencies": {
     "axios": "^1.6.0",
