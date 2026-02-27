@@ -262,8 +262,10 @@ export function setupIpcHandlers(steam: SteamClient, idle: IdleManager): void {
   // ── Partner Apps ──────────────────────────────────────────────────────────
 
   const PARTNER_APPS: Array<{ key: string; owner: string; repo: string }> = [
-    { key: 'myle', owner: 'thomasthanos', repo: 'Make_Your_Life_Easier.A.E' },
-    { key: 'gbr',  owner: 'thomasthanos', repo: 'Github-Build-Release' },
+    { key: 'myle',          owner: 'thomasthanos', repo: 'Make_Your_Life_Easier.A.E' },
+    { key: 'gbr',           owner: 'thomasthanos', repo: 'Github-Build-Release' },
+    { key: 'backup',        owner: 'thomasthanos', repo: 'backup_projects' },
+    { key: 'discordviewer', owner: 'thomasthanos', repo: 'discord_package_viewer' },
   ]
 
   // Fetch latest release info for both partner apps from GitHub API
