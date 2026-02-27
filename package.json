@@ -5,6 +5,7 @@
   "author": "ThomasThanos",
   "main": "dist/main/main/index.js",
   "scripts": {
+    "build:main": "tsc -p tsconfig.main.json",
     "dev": "npm run build:main && concurrently \"npm run dev:main\" \"npm run dev:renderer\" \"npm run dev:electron\"",
     "dev:main": "tsc -p tsconfig.main.json --watch",
     "dev:renderer": "vite",
