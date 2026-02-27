@@ -1,6 +1,5 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { Settings, Moon, Sun, Monitor, Key, Shield, Bell, Eye, Power, Volume2, RefreshCw, Download, CheckCircle, ExternalLink, AlertCircle } from 'lucide-react'
-import { useUpdater } from '../hooks/useUpdater'
 import { AppSettings, PartnerAppRelease, PartnerAppDownloadProgress } from '@shared/types'
 import { useAppContext } from '../hooks/useAppContext'
 import { applyTheme } from '../hooks/useTheme'
@@ -9,7 +8,6 @@ import clsx from 'clsx'
 
 export default function SettingsPage() {
   const { settings, updateSettings } = useAppContext()
-  const { state: updaterState, check: checkUpdate } = useUpdater()
   const [apiKey, setApiKey] = useState(settings.steamApiKey ?? '')
   const [steamId, setSteamId] = useState(settings.steamId ?? '')
   const [customAppIds, setCustomAppIds] = useState(settings.customAppIds ?? '')
@@ -330,87 +328,6 @@ export default function SettingsPage() {
               </button>
             </div>
           ))}
-        </section>
-
-        {/* ── About / Updates ── */}
-        <section className="card space-y-4">
-          <h2 className="text-xs font-semibold uppercase tracking-wider flex items-center gap-2" style={{ color: 'var(--muted)' }}>
-            <RefreshCw className="w-3.5 h-3.5" /> About
-          </h2>
-
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Souvlatzidiko-Unlocker</p>
-              <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>
-                Built with Electron, React &amp; TypeScript. Not affiliated with Valve.
-              </p>
-            </div>
-            {/* Check for updates button */}
-            <button
-              onClick={checkUpdate}
-              disabled={updaterState.status === 'checking' || updaterState.status === 'available' || updaterState.status === 'downloading' || updaterState.status === 'downloaded'}
-              className="btn-ghost text-xs shrink-0 flex items-center gap-1.5"
-              style={
-                updaterState.status === 'downloaded'
-                  ? { color: 'var(--green)', borderColor: 'rgba(34,197,94,0.3)' }
-                  : updaterState.status === 'available'
-                    ? { color: 'var(--accent)', borderColor: 'rgba(59,130,246,0.3)' }
-                    : {}
-              }
-            >
-              {updaterState.status === 'checking'                         && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
-              {(updaterState.status === 'available' || updaterState.status === 'downloading') && <Download className="w-3.5 h-3.5 animate-pulse" />}
-              {updaterState.status === 'downloaded'                        && <CheckCircle className="w-3.5 h-3.5" style={{ color: 'var(--green)' }} />}
-              {(updaterState.status === 'idle' || updaterState.status === 'not-available' || updaterState.status === 'error') && <RefreshCw className="w-3.5 h-3.5" />}
-
-              {updaterState.status === 'idle'          && 'Check for updates'}
-              {updaterState.status === 'checking'      && 'Checking…'}
-              {updaterState.status === 'not-available' && 'Up to date'}
-              {updaterState.status === 'available'     && `Downloading v${updaterState.version}…`}
-              {updaterState.status === 'downloading'   && `Downloading — ${updaterState.percent}%`}
-              {updaterState.status === 'downloaded'    && `v${updaterState.version} ready`}
-              {updaterState.status === 'error'         && 'Retry check'}
-            </button>
-          </div>
-
-          {/* Downloading — auto-started when update found */}
-          {(updaterState.status === 'available' || updaterState.status === 'downloading') && (
-            <div className="rounded-xl px-3 py-2.5"
-              style={{ background: 'rgba(59,130,246,0.07)', border: '1px solid rgba(59,130,246,0.2)' }}>
-              <p className="text-xs font-semibold" style={{ color: 'var(--accent)' }}>
-                {updaterState.status === 'available'
-                  ? `Downloading v${updaterState.version}…`
-                  : `Downloading v${updaterState.version} — ${updaterState.percent}%`}
-              </p>
-              {updaterState.status === 'downloading' && (
-                <div className="mt-1.5 h-1 rounded-full overflow-hidden" style={{ background: 'var(--border)' }}>
-                  <div className="h-full rounded-full transition-all duration-300" style={{ width: `${updaterState.percent}%`, background: 'var(--accent)' }} />
-                </div>
-              )}
-              {(updaterState as any).releaseNotes && (
-                <p className="text-xs mt-1 max-w-xs truncate" style={{ color: 'var(--muted)' }}>{(updaterState as any).releaseNotes}</p>
-              )}
-            </div>
-          )}
-
-          {/* Error details */}
-          {updaterState.status === 'error' && updaterState.message && (
-            <div className="flex items-center gap-2 rounded-xl px-3 py-2.5"
-              style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.18)' }}>
-              <p className="text-xs" style={{ color: 'var(--red)' }}>{updaterState.message}</p>
-            </div>
-          )}
-
-          {/* Downloaded — restarting automatically */}
-          {updaterState.status === 'downloaded' && (
-            <div className="flex items-center gap-2 rounded-xl px-3 py-2.5"
-              style={{ background: 'rgba(34,197,94,0.07)', border: '1px solid rgba(34,197,94,0.2)' }}>
-              <RefreshCw className="w-3.5 h-3.5 animate-spin shrink-0" style={{ color: 'var(--green)' }} />
-              <p className="text-xs font-semibold" style={{ color: 'var(--green)' }}>
-                v{updaterState.version} downloaded — restarting automatically…
-              </p>
-            </div>
-          )}
         </section>
 
         {/* ── More Apps by ThomasThanos ── */}
