@@ -180,30 +180,33 @@ async function runSplashFlow(onReady) {
             call('_setProgress', evt.percent);
         }
     };
-    // Build the preload function — warms Steam + user + games cache
-    // so the main window opens with data instantly ready
+    // Preload fn — runs IN PARALLEL with the update check.
+    // Status messages here are the primary UI driver; update check only
+    // overrides when it has something important to say (downloading, error).
     const preloadFn = async (emit) => {
-        emit({ type: 'status', text: 'Loading Steam…' });
-        emit({ type: 'progress', percent: 20 });
+        emit({ type: 'status', text: 'Connecting to Steam…' });
+        emit({ type: 'progress', percent: 10 });
         try {
             const isRunning = await steamClient.isSteamRunning().catch(() => false);
-            emit({ type: 'progress', percent: 40 });
+            emit({ type: 'progress', percent: 25 });
             if (isRunning) {
-                emit({ type: 'status', text: 'Loading user info…' });
+                emit({ type: 'status', text: 'Loading profile…' });
                 await steamClient.getUserInfo().catch(() => null);
-                emit({ type: 'progress', percent: 65 });
-                emit({ type: 'status', text: 'Loading games library…' });
+                emit({ type: 'progress', percent: 50 });
+                emit({ type: 'status', text: 'Loading library…' });
                 await steamClient.getOwnedGames().catch(() => null);
-                emit({ type: 'progress', percent: 90 });
+                emit({ type: 'progress', percent: 92 });
             }
             else {
-                emit({ type: 'progress', percent: 90 });
+                emit({ type: 'status', text: 'Steam not running — launching anyway…' });
+                emit({ type: 'progress', percent: 92 });
             }
         }
-        catch { /* silent — splash will just close */ }
+        catch { /* silent — splash will still close */ }
         emit({ type: 'progress', percent: 100 });
         emit({ type: 'status', text: 'Ready!' });
-        await new Promise(r => setTimeout(r, 300));
+        // Brief pause so the user sees 100% before the window appears
+        await new Promise(r => setTimeout(r, 250));
     };
     // Run update check — this resolves when the flow is complete
     await (0, updater_1.performStartupUpdateCheck)(onSplashEvent, preloadFn);

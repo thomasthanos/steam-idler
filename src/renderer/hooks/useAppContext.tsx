@@ -71,19 +71,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
     const gameRelatedKeys: (keyof AppSettings)[] = ['customAppIds', 'steamApiKey', 'steamId']
     if (gameRelatedKeys.some((k) => k in partial)) {
-      // Do the forced re-fetch directly here — do NOT call setGamesFetched(false) first,
-      // because that would change the fetchGames ref, triggering GamesPage's useEffect
-      // and causing a second concurrent getOwnedGames call (double-fetch race).
+      // Fire in background — do NOT await so the Settings page isn't frozen
+      // while getOwnedGames() makes dozens of Steam Web API calls.
+      // GamesPage shows its own loading skeleton via isLoadingGames.
       setIsLoadingGames(true)
-      try {
-        const res = await window.steam.getOwnedGames(true)
-        if (res.success && res.data) {
-          setGames(res.data)
-          setGamesFetched(true)
-        }
-      } catch { /* silent */ } finally {
-        setIsLoadingGames(false)
-      }
+      window.steam.getOwnedGames(true)
+        .then(res => {
+          if (res.success && res.data) {
+            setGames(res.data)
+            setGamesFetched(true)
+          }
+        })
+        .catch(() => { /* silent */ })
+        .finally(() => setIsLoadingGames(false))
     }
   }
 

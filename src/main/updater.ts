@@ -60,23 +60,25 @@ function broadcast(state: UpdaterState) {
 export type PreloadFn = (onEvent: (evt: SplashEvent) => void) => Promise<void>
 
 // ─── performStartupUpdateCheck ────────────────────────────────────────────────
+//
+// Update check and data preload run IN PARALLEL from t=0.
+// The splash closes (resolve) only when BOTH are complete.
+// If an update is found and downloaded, the app restarts instead.
+//
 export function performStartupUpdateCheck(
   onEvent: (evt: SplashEvent) => void,
   preload?: PreloadFn
 ): Promise<void> {
   return new Promise((resolve) => {
-    let finished = false
-    let timeoutHandle: ReturnType<typeof setTimeout> | null = null
+    let resolved    = false   // guard: resolve() called at most once
+    let willInstall = false   // update downloaded — app will restart, never resolve
+    let updateDone  = false   // update check finished (ok / no-update / error)
+    let preloadDone = !preload // if no preload fn treat it as already done
 
-    const done = () => {
-      if (finished) return
-      finished = true
-      if (timeoutHandle) clearTimeout(timeoutHandle)
-      cleanup()
-      resolve()
-    }
+    let safetyTimer: ReturnType<typeof setTimeout> | null = null
 
     const cleanup = () => {
+      if (safetyTimer) { clearTimeout(safetyTimer); safetyTimer = null }
       autoUpdater.removeListener('update-available',     onAvailable)
       autoUpdater.removeListener('update-not-available', onNotAvailable)
       autoUpdater.removeListener('download-progress',    onProgress)
@@ -84,47 +86,47 @@ export function performStartupUpdateCheck(
       autoUpdater.removeListener('error',                onError)
     }
 
-    // Clear the safety timeout as soon as ANY update event fires.
-    // Without this, if the preload takes a while the timeout could fire
-    // mid-preload and call runPreloadThenDone() a second time.
-    const clearSafetyTimeout = () => {
-      if (timeoutHandle) { clearTimeout(timeoutHandle); timeoutHandle = null }
+    // Resolve only when BOTH update check and preload have finished.
+    const tryResolve = () => {
+      if (resolved || willInstall || !updateDone || !preloadDone) return
+      resolved = true
+      cleanup()
+      resolve()
     }
 
+    // ── Preload starts IMMEDIATELY at t=0, parallel with update check ────────
+    if (preload) {
+      preload(onEvent)
+        .catch(() => { /* silent — still open app */ })
+        .finally(() => { preloadDone = true; tryResolve() })
+    }
+
+    // ── Update check event handlers ──────────────────────────────────
     const onAvailable = (info: UpdateInfo) => {
-      clearSafetyTimeout()
-      onEvent({ type: 'status', text: `Downloading v${info.version}…` })
-      // autoDownload = false globally, so we trigger the download manually here
-      // (only during the splash flow — background checks require a user click)
+      onEvent({ type: 'status', text: `Update v${info.version} found — downloading…` })
       autoUpdater.downloadUpdate().catch((err: Error) => onError(err))
-    }
-
-    const runPreloadThenDone = () => {
-      clearSafetyTimeout()
-      if (preload) {
-        preload(onEvent).catch(() => {}).finally(() => done())
-      } else {
-        done()
-      }
+      // updateDone intentionally NOT set — we wait for onDownloaded or error
     }
 
     const onNotAvailable = () => {
-      onEvent({ type: 'status', text: 'Up to date.' })
-      runPreloadThenDone()
+      // No update — update side is done, wait for preload if still running
+      updateDone = true
+      tryResolve()
     }
 
     const onProgress = (p: ProgressInfo) => {
       const pct = Math.round(p.percent)
       onEvent({ type: 'progress', percent: pct })
-      onEvent({ type: 'status', text: `Downloading… ${pct}%` })
+      onEvent({ type: 'status',   text: `Downloading update… ${pct}%` })
     }
 
     const onDownloaded = (info: UpdateInfo) => {
-      onEvent({ type: 'status', text: `v${info.version} ready — restarting…`, cls: 'success' })
+      willInstall = true
+      onEvent({ type: 'status',   text: `v${info.version} ready — restarting…`, cls: 'success' })
       onEvent({ type: 'progress', percent: 100 })
       cleanup()
       setTimeout(() => autoUpdater.quitAndInstall(true, true), 1500)
-      // resolve never called — app will restart
+      // resolve() is intentionally never called — app will restart
     }
 
     const onError = (err: Error) => {
@@ -132,12 +134,11 @@ export function performStartupUpdateCheck(
       const isNetwork = msg.includes('No internet') || msg.includes('unavailable') || msg.includes('unexpected response')
       onEvent({
         type: 'status',
-        text: isNetwork ? 'No internet — skipping update.' : `Update check failed: ${msg}`,
+        text: isNetwork ? 'No internet — skipping update check.' : `Update check failed: ${msg}`,
         cls: 'warn',
       })
-      // Still run the preload even if the update check failed — the splash
-      // window is already open so we use the time to warm the data cache.
-      runPreloadThenDone()
+      updateDone = true
+      tryResolve()
     }
 
     autoUpdater.on('update-available',     onAvailable)
@@ -146,13 +147,15 @@ export function performStartupUpdateCheck(
     autoUpdater.on('update-downloaded',    onDownloaded)
     autoUpdater.on('error',                onError)
 
-    // Safety timeout — if no event fires within 8s, run preload anyway
-    timeoutHandle = setTimeout(() => {
-      onEvent({ type: 'status', text: 'Update check timed out.', cls: 'warn' })
-      runPreloadThenDone()
-    }, 8000)
+    // Safety timeout — if either side hangs, open the app anyway after 12 s
+    safetyTimer = setTimeout(() => {
+      safetyTimer = null
+      onEvent({ type: 'status', text: 'Loading timed out — opening app.', cls: 'warn' })
+      updateDone  = true
+      preloadDone = true
+      tryResolve()
+    }, 12_000)
 
-    onEvent({ type: 'status', text: 'Checking for updates…' })
     autoUpdater.checkForUpdates().catch((err: Error) => onError(err))
   })
 }
