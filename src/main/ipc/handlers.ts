@@ -53,8 +53,8 @@ export function setupIpcHandlers(steam: SteamClient, idle: IdleManager): void {
     wrap(() => steam.resetAllStats(appId))
   )
 
-  ipcMain.handle(IPC.STOP_GAME, () =>
-    wrap(() => steam.stopGame())
+  ipcMain.handle(IPC.STOP_GAME, (_e, appId?: number) =>
+    wrap(() => steam.stopGame(appId))
   )
 
   // ── Settings ──────────────────────────────────────────────────────────────

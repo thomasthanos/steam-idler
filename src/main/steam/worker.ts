@@ -59,7 +59,6 @@ function handleInit(id: number, appId: number, apiKey?: string) {
     client = sw.init(appId)
     currentAppId = appId
     if (apiKey) storedApiKey = apiKey
-    // Start the callback loop immediately so Steam processes events
     startCallbackLoop()
     send(id, true, { appId })
   } catch (e: unknown) {
@@ -73,6 +72,11 @@ async function handleGetAchievements(id: number) {
 
   try {
     const schema = await fetchSchema(currentAppId, storedApiKey)
+
+    if (schema.achievements.length === 0) {
+      send(id, true, [])
+      return
+    }
 
     // Global percentages
     let globalPct: Record<string, number> = {}

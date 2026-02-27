@@ -83,15 +83,17 @@ function performStartupUpdateCheck(onEvent, preload) {
             // (only during the splash flow — background checks require a user click)
             electron_updater_1.autoUpdater.downloadUpdate().catch((err) => onError(err));
         };
-        const onNotAvailable = () => {
-            onEvent({ type: 'status', text: 'Up to date.' });
+        const runPreloadThenDone = () => {
             if (preload) {
-                // Use the splash window time to preload data in the background
                 preload(onEvent).catch(() => { }).finally(() => done());
             }
             else {
-                setTimeout(done, 600);
+                done();
             }
+        };
+        const onNotAvailable = () => {
+            onEvent({ type: 'status', text: 'Up to date.' });
+            runPreloadThenDone();
         };
         const onProgress = (p) => {
             const pct = Math.round(p.percent);
@@ -113,17 +115,19 @@ function performStartupUpdateCheck(onEvent, preload) {
                 text: isNetwork ? 'No internet — skipping update.' : `Update check failed: ${msg}`,
                 cls: 'warn',
             });
-            setTimeout(done, 800);
+            // Still run the preload even if the update check failed — the splash
+            // window is already open so we use the time to warm the data cache.
+            runPreloadThenDone();
         };
         electron_updater_1.autoUpdater.on('update-available', onAvailable);
         electron_updater_1.autoUpdater.on('update-not-available', onNotAvailable);
         electron_updater_1.autoUpdater.on('download-progress', onProgress);
         electron_updater_1.autoUpdater.on('update-downloaded', onDownloaded);
         electron_updater_1.autoUpdater.on('error', onError);
-        // Safety timeout — if no event fires within 8s, continue anyway
+        // Safety timeout — if no event fires within 8s, run preload anyway
         timeoutHandle = setTimeout(() => {
             onEvent({ type: 'status', text: 'Update check timed out.', cls: 'warn' });
-            done();
+            runPreloadThenDone();
         }, 8000);
         onEvent({ type: 'status', text: 'Checking for updates…' });
         electron_updater_1.autoUpdater.checkForUpdates().catch((err) => onError(err));

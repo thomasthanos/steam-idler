@@ -63,31 +63,36 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.SteamClient = void 0;
 const child_process_1 = require("child_process");
 const path = __importStar(require("path"));
-const electron_store_1 = __importDefault(require("electron-store"));
 const axios_1 = __importDefault(require("axios"));
-const types_1 = require("../../shared/types");
 const steamPaths_1 = require("./steamPaths");
+const store_1 = require("../store");
 // ─── Persistent settings ───────────────────────────────────────────────────
-const store = new electron_store_1.default({
-    name: 'config', // explicit filename → config.json
-    defaults: { settings: types_1.DEFAULT_SETTINGS },
-});
-function getSettings() { return store.get('settings'); }
+// Uses the shared lazy singleton from store.ts so that app.setPath('userData')
+// in index.ts is guaranteed to have run before the store is first opened.
+// A local `new Store()` at module-level would be created during the import
+// phase — before app.setPath() executes — and would therefore resolve to the
+// wrong (default Electron) userData directory.
+function getSettings() { return (0, store_1.getStore)().get('settings'); }
 // ─── Games cache ────────────────────────────────────────────────────────────
 const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
+// Bump this whenever the shape of cached data changes so stale caches are
+// automatically invalidated on the next launch instead of showing wrong data.
+const CACHE_VERSION = 2;
 function getCachedGames() {
-    const cached = store.get('gamesCache');
+    const cached = (0, store_1.getStore)().get('gamesCache');
     if (!cached)
         return null;
+    if (cached.version !== CACHE_VERSION)
+        return null; // schema changed
     if (Date.now() - cached.timestamp > CACHE_TTL_MS)
         return null;
     return cached.data;
 }
 function setCachedGames(data) {
-    store.set('gamesCache', { data, timestamp: Date.now() });
+    (0, store_1.getStore)().set('gamesCache', { data, timestamp: Date.now(), version: CACHE_VERSION });
 }
 function clearGamesCache() {
-    store.delete('gamesCache');
+    (0, store_1.getStore)().delete('gamesCache');
 }
 class WorkerBridge {
     constructor() {
@@ -171,7 +176,17 @@ class WorkerBridge {
                 this.pending.clear();
             }
         });
-        await this.send({ type: 'INIT', appId, apiKey: apiKey || undefined }, proc);
+        const INIT_TIMEOUT_MS = 20000;
+        await Promise.race([
+            this.send({ type: 'INIT', appId, apiKey: apiKey || undefined }, proc),
+            new Promise((_, reject) => setTimeout(() => {
+                try {
+                    proc.kill();
+                }
+                catch { /* ok */ }
+                reject(new Error('Steam initialization timed out. Make sure Steam is running.'));
+            }, INIT_TIMEOUT_MS)),
+        ]);
     }
     send(msg, targetProc) {
         return new Promise((resolve, reject) => {
@@ -301,8 +316,10 @@ class SteamClient {
             }
             catch { /* keep defaults */ }
         }
-        if (!avatarUrl && steamId64) {
-            avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(personaName.slice(0, 2).toUpperCase())}&background=1a9fff&color=fff&size=128&bold=true`;
+        // Always ensure we have a fallback avatar — even if no steamId was found
+        if (!avatarUrl) {
+            const initials = personaName.slice(0, 2).toUpperCase() || 'ST';
+            avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(initials)}&background=1a9fff&color=fff&size=128&bold=true`;
         }
         return {
             steamId: steamId64,
@@ -358,6 +375,7 @@ class SteamClient {
         }));
         // ── 3. Fetch full owned games list from Steam Web API ───────────────────
         let steamId64 = settings.steamId || '';
+        const webApiAppIds = new Set();
         if (settings.steamApiKey) {
             try {
                 if (!steamId64) {
@@ -371,16 +389,26 @@ class SteamClient {
                 const webGames = res?.data?.response?.games ?? [];
                 for (const wg of webGames) {
                     addGame(wg.appid, wg.name, wg.playtime_forever, wg.rtime_last_played);
+                    webApiAppIds.add(wg.appid);
                 }
-                // ── 4. Fetch achievement counts in batches ──────────────────────────
-                const appIdsForStats = Array.from(gamesMap.keys()).filter(id => customAppIds.includes(id) ||
+                // ── 4. Fetch achievement counts ─────────────────────────────────────
+                //
+                // Strategy:
+                //   Pass B — GetPlayerAchievements for played/installed/custom games.
+                //     Fast, accurate unlock counts. Fails on private profiles.
+                //   Pass A — GetSchemaForGame ONLY for games still showing 0 after Pass B.
+                //     Catches private-profile games and games with 0 playtime.
+                //     Smaller set = no rate-limit issues.
+                const allGameIds = Array.from(gamesMap.keys());
+                // Pass B first: player unlock state for played/installed games
+                const playedIds = allGameIds.filter(id => customAppIds.includes(id) ||
                     (gamesMap.get(id).playtimeForever > 0) ||
                     installed.some(ia => ia.appId === id));
-                for (let i = 0; i < appIdsForStats.length; i += 10) {
-                    const chunk = appIdsForStats.slice(i, i + 10);
+                for (let i = 0; i < playedIds.length; i += 10) {
+                    const chunk = playedIds.slice(i, i + 10);
                     await Promise.allSettled(chunk.map(async (appid) => {
                         try {
-                            const achRes = await axios_1.default.get(`https://api.steampowered.com/ISteamUserStats/GetPlayerAchievements/v1/?key=${settings.steamApiKey}&steamid=${steamId64}&appid=${appid}`, { timeout: 4000 });
+                            const achRes = await axios_1.default.get(`https://api.steampowered.com/ISteamUserStats/GetPlayerAchievements/v1/?key=${settings.steamApiKey}&steamid=${steamId64}&appid=${appid}`, { timeout: 5000 });
                             const achs = achRes?.data?.playerstats?.achievements ?? [];
                             if (achs.length > 0) {
                                 const game = gamesMap.get(appid);
@@ -391,7 +419,26 @@ class SteamClient {
                                 }
                             }
                         }
-                        catch { /* game has no stats or private profile */ }
+                        catch { /* private profile or no stats — Pass A will cover these */ }
+                    }));
+                }
+                // Pass A: schema fallback for any played/installed game still showing 0
+                // (private profile, API error, etc). NOT run for unplayed games to
+                // avoid hammering the API with hundreds of requests.
+                const stillZeroIds = playedIds.filter(id => gamesMap.get(id).achievementCount === 0);
+                for (let i = 0; i < stillZeroIds.length; i += 10) {
+                    const chunk = stillZeroIds.slice(i, i + 10);
+                    await Promise.allSettled(chunk.map(async (appid) => {
+                        try {
+                            const schRes = await axios_1.default.get(`https://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/?key=${settings.steamApiKey}&appid=${appid}&l=english`, { timeout: 6000 });
+                            const achs = schRes?.data?.game?.availableGameStats?.achievements ?? [];
+                            if (achs.length > 0) {
+                                const game = gamesMap.get(appid);
+                                if (game)
+                                    game.achievementCount = achs.length;
+                            }
+                        }
+                        catch { /* game genuinely has no achievements */ }
                     }));
                 }
             }
@@ -400,11 +447,12 @@ class SteamClient {
             }
         }
         // ── 5. Final filter ─────────────────────────────────────────────────────
-        const hasAnyStats = Array.from(gamesMap.values()).some(g => g.achievementCount > 0);
         let finalGames = Array.from(gamesMap.values());
-        if (settings.steamApiKey && hasAnyStats) {
-            finalGames = finalGames.filter(g => g.achievementCount > 0 ||
-                customAppIds.includes(g.appId));
+        // Only show games that have achievements, or are explicitly added via
+        // customAppIds (user may want to idle a game with no achievements).
+        const hasAnyStats = finalGames.some(g => g.achievementCount > 0);
+        if (hasAnyStats) {
+            finalGames = finalGames.filter(g => g.achievementCount > 0 || customAppIds.includes(g.appId));
         }
         const result = finalGames.sort((a, b) => a.name.localeCompare(b.name));
         setCachedGames(result);
@@ -428,7 +476,13 @@ class SteamClient {
         await worker.send({ type: 'RESET_STATS' });
     }
     // ── Stop current game (kill worker) ────────────────────────────────────────
-    async stopGame() {
+    // Accepts an optional appId — if provided, only kills the worker if it is
+    // still running *that* game. This prevents a delayed cleanup from a
+    // previously-viewed game from killing the worker that was just spawned for
+    // the new game the user navigated to.
+    async stopGame(appId) {
+        if (appId !== undefined && worker.currentAppId !== appId)
+            return;
         await worker.kill();
     }
     // ── Cleanup ───────────────────────────────────────────────────────────────

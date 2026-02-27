@@ -32,7 +32,10 @@ const steamAPI = {
     resolveAppName: (appId) => electron_1.ipcRenderer.invoke(types_1.IPC.RESOLVE_APP_NAME, appId),
     searchGames: (term) => electron_1.ipcRenderer.invoke(types_1.IPC.SEARCH_GAMES, term),
     // Worker control
-    stopGame: () => electron_1.ipcRenderer.invoke(types_1.IPC.STOP_GAME),
+    // Pass appId so the main process only kills the worker if it's still
+    // running *that* game — preventing a delayed cleanup from a previously-viewed
+    // game from killing the worker that was just spawned for the next game.
+    stopGame: (appId) => electron_1.ipcRenderer.invoke(types_1.IPC.STOP_GAME, appId),
     // Auto-updater
     checkForUpdates: () => electron_1.ipcRenderer.invoke(types_1.IPC.UPDATER_CHECK),
     onUpdaterStatus: (cb) => {

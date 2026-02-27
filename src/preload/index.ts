@@ -68,8 +68,11 @@ const steamAPI = {
     ipcRenderer.invoke(IPC.SEARCH_GAMES, term),
 
   // Worker control
-  stopGame: (): Promise<IPCResponse<void>> =>
-    ipcRenderer.invoke(IPC.STOP_GAME),
+  // Pass appId so the main process only kills the worker if it's still
+  // running *that* game — preventing a delayed cleanup from a previously-viewed
+  // game from killing the worker that was just spawned for the next game.
+  stopGame: (appId?: number): Promise<IPCResponse<void>> =>
+    ipcRenderer.invoke(IPC.STOP_GAME, appId),
 
   // Auto-updater
   checkForUpdates: (): Promise<IPCResponse<void>> =>

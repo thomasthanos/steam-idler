@@ -163,7 +163,10 @@ export default function AchievementsPage() {
     return () => {
       // Delay slightly — if StrictMode remounts immediately this gets cancelled
       stopTimerRef.current = setTimeout(() => {
-        window.steam.stopGame().catch(() => {})
+        // Pass the appId so the main process only kills this specific worker.
+        // Without it, a delayed cleanup from game A could kill the freshly-
+        // spawned worker for game B if the user navigated there quickly.
+        window.steam.stopGame(numAppId).catch(() => {})
       }, 300)
     }
   }, [])
@@ -265,6 +268,7 @@ export default function AchievementsPage() {
   const isPerfect = total > 0 && pct === 100
 
   const coverUrl  = `https://cdn.cloudflare.steamstatic.com/steam/apps/${numAppId}/header.jpg`
+  const [coverFailed, setCoverFailed] = useState(false)
 
   return (
     <div className="flex flex-col h-full" style={{ background: 'var(--bg)' }}>
@@ -274,8 +278,11 @@ export default function AchievementsPage() {
 
         {/* Blurred cover bg — very subtle */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <img src={coverUrl} alt="" className="w-full h-full object-cover scale-110 blur-2xl opacity-10"
-            onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+          {!coverFailed
+            ? <img src={coverUrl} alt="" className="w-full h-full object-cover scale-110 blur-2xl opacity-10"
+                onError={() => setCoverFailed(true)} />
+            : <div className="w-full h-full opacity-10" style={{ background: `linear-gradient(135deg, hsl(${numAppId % 360},40%,20%), hsl(${(numAppId * 7) % 360},50%,28%))` }} />
+          }
         </div>
 
         <div className="relative px-6 py-4">
@@ -319,8 +326,14 @@ export default function AchievementsPage() {
           <div className="flex items-center gap-4">
             <div className="shrink-0 rounded-lg overflow-hidden hidden sm:block"
               style={{ width: 96, aspectRatio: '460/215', boxShadow: '0 4px 16px rgba(0,0,0,0.3)' }}>
-              <img src={coverUrl} alt="" className="w-full h-full object-cover"
-                onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+              {!coverFailed
+                ? <img src={coverUrl} alt="" className="w-full h-full object-cover"
+                    onError={() => setCoverFailed(true)} />
+                : <div className="w-full h-full flex items-center justify-center font-bold text-white/60 text-xl"
+                    style={{ background: `linear-gradient(135deg, hsl(${numAppId % 360},40%,20%), hsl(${(numAppId * 7) % 360},50%,28%))` }}>
+                    {(gameName ?? `App ${appId}`).charAt(0).toUpperCase()}
+                  </div>
+              }
             </div>
 
             <div className="flex-1 min-w-0">
@@ -430,24 +443,43 @@ export default function AchievementsPage() {
             </div>
           )}
 
-          {/* API key error */}
-          {!loading && loadError !== null && (
-            <div className="flex flex-col items-center justify-center h-full gap-5 py-16">
-              <div className="w-16 h-16 rounded-3xl flex items-center justify-center border"
-                style={{ background: 'rgba(59,130,246,0.08)', borderColor: 'rgba(59,130,246,0.2)' }}>
-                <Key className="w-7 h-7" style={{ color: 'rgba(59,130,246,0.6)' }} />
+          {/* Error state — shows correct message based on error type */}
+          {!loading && loadError !== null && (() => {
+            const isApiKeyError = loadError.toLowerCase().includes('api key')
+            return (
+              <div className="flex flex-col items-center justify-center h-full gap-5 py-16">
+                <div className="w-16 h-16 rounded-3xl flex items-center justify-center border"
+                  style={isApiKeyError
+                    ? { background: 'rgba(59,130,246,0.08)', borderColor: 'rgba(59,130,246,0.2)' }
+                    : { background: 'rgba(239,68,68,0.08)', borderColor: 'rgba(239,68,68,0.2)' }
+                  }>
+                  {isApiKeyError
+                    ? <Key className="w-7 h-7" style={{ color: 'rgba(59,130,246,0.6)' }} />
+                    : <AlertTriangle className="w-7 h-7" style={{ color: 'rgba(239,68,68,0.6)' }} />
+                  }
+                </div>
+                <div className="text-center">
+                  <p className="font-semibold mb-1" style={{ color: 'var(--text)' }}>
+                    {isApiKeyError ? 'Steam API Key Required' : 'Failed to Load Achievements'}
+                  </p>
+                  <p className="text-sm max-w-xs" style={{ color: 'var(--muted)' }}>
+                    {isApiKeyError
+                      ? 'Add an API key in Settings to load achievement names and descriptions.'
+                      : loadError
+                    }
+                  </p>
+                </div>
+                {isApiKeyError
+                  ? <button onClick={() => navigate('/settings')} className="btn-primary">
+                      <Key className="w-4 h-4" /> Open Settings
+                    </button>
+                  : <button onClick={fetchAchievements} className="btn-primary">
+                      <RefreshCw className="w-4 h-4" /> Retry
+                    </button>
+                }
               </div>
-              <div className="text-center">
-                <p className="font-semibold mb-1" style={{ color: 'var(--text)' }}>Steam API Key Required</p>
-                <p className="text-sm max-w-xs" style={{ color: 'var(--muted)' }}>
-                  Add an API key in Settings to load achievement names and descriptions.
-                </p>
-              </div>
-              <button onClick={() => navigate('/settings')} className="btn-primary">
-                <Key className="w-4 h-4" /> Open Settings
-              </button>
-            </div>
-          )}
+            )
+          })()}
 
           {/* No achievements */}
           {!loading && loadError === null && total === 0 && (

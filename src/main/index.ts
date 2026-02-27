@@ -304,6 +304,8 @@ function createWindow(): void {
   mainWindow.webContents.on('console-message', (_e, level, message) => {
     if (message.includes('cdn.cloudflare.steamstatic.com')) return
     if (message.includes('store.steampowered.com') && message.includes('404')) return
+    if (message.includes('Content-Security-Policy')) return
+    if (message.includes('Electron Security Warning')) return
     if (level === 0 || level === 1) return
     if (level === 2) process.stdout.write(`[renderer:warn] ${message}\n`)
     if (level === 3) process.stderr.write(`[renderer:error] ${message}\n`)

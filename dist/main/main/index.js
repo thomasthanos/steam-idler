@@ -332,6 +332,10 @@ function createWindow() {
             return;
         if (message.includes('store.steampowered.com') && message.includes('404'))
             return;
+        if (message.includes('Content-Security-Policy'))
+            return;
+        if (message.includes('Electron Security Warning'))
+            return;
         if (level === 0 || level === 1)
             return;
         if (level === 2)

@@ -65,7 +65,6 @@ function handleInit(id, appId, apiKey) {
         currentAppId = appId;
         if (apiKey)
             storedApiKey = apiKey;
-        // Start the callback loop immediately so Steam processes events
         startCallbackLoop();
         send(id, true, { appId });
     }
@@ -84,6 +83,10 @@ async function handleGetAchievements(id) {
     }
     try {
         const schema = await fetchSchema(currentAppId, storedApiKey);
+        if (schema.achievements.length === 0) {
+            send(id, true, []);
+            return;
+        }
         // Global percentages
         let globalPct = {};
         try {

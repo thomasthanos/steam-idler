@@ -7,14 +7,18 @@ interface GameImageProps {
 }
 
 // Steam CDN image candidates, tried in order.
-// header.jpg   → 460×215 — most common
+// header.jpg         → 460×215 — most common, present on virtually all games
 // capsule_231x87.jpg → smaller capsule, present on most games
-// capsule_sm_120.jpg → tiny capsule, almost always present
+// capsule_sm_120.jpg intentionally omitted — almost never exists on the CDN
+//                    and only adds 404 noise to the browser console.
 const getCandidates = (appId: number) => [
   `https://cdn.cloudflare.steamstatic.com/steam/apps/${appId}/header.jpg`,
   `https://cdn.cloudflare.steamstatic.com/steam/apps/${appId}/capsule_231x87.jpg`,
-  `https://cdn.cloudflare.steamstatic.com/steam/apps/${appId}/capsule_sm_120.jpg`,
 ]
+
+// Module-level cache so results persist across remounts and page navigation.
+// Stores either the first working URL, or null if all candidates failed.
+const imageCache = new Map<number, string | null>()
 
 // Deterministic letter avatar — zero HTTP requests
 function LetterAvatar({ name }: { name: string }) {
@@ -33,16 +37,27 @@ function LetterAvatar({ name }: { name: string }) {
 }
 
 const GameImage = memo(({ appId, name, className = '' }: GameImageProps) => {
-  const candidates    = getCandidates(appId)
-  const indexRef      = useRef(0)
-  const [src, setSrc] = useState(candidates[0])
-  const [failed, setFailed]  = useState(false)
+  // Check cache first — avoids re-firing 404 requests on remount/re-render
+  const cached = imageCache.get(appId)
+  const candidates = getCandidates(appId)
 
-  // Reset when appId changes
+  const indexRef      = useRef(0)
+  const [src, setSrc] = useState<string>(cached !== undefined && cached !== null ? cached : candidates[0])
+  const [failed, setFailed] = useState<boolean>(cached === null)
+
+  // Reset when appId changes, respecting cache
   useEffect(() => {
-    indexRef.current = 0
-    setSrc(getCandidates(appId)[0])
-    setFailed(false)
+    const hit = imageCache.get(appId)
+    if (hit !== undefined) {
+      // Already resolved: jump straight to known-good URL or letter avatar
+      indexRef.current = 0
+      setSrc(hit ?? candidates[0])
+      setFailed(hit === null)
+    } else {
+      indexRef.current = 0
+      setSrc(getCandidates(appId)[0])
+      setFailed(false)
+    }
   }, [appId])
 
   if (failed) return <LetterAvatar name={name} />
@@ -60,8 +75,14 @@ const GameImage = memo(({ appId, name, className = '' }: GameImageProps) => {
         if (nextUrl) {
           setSrc(nextUrl)   // try next candidate silently
         } else {
-          setFailed(true)   // all candidates exhausted → letter avatar
+          // All candidates exhausted — cache the failure so we never retry
+          imageCache.set(appId, null)
+          setFailed(true)
         }
+      }}
+      onLoad={() => {
+        // Cache the first URL that loads successfully
+        if (!imageCache.has(appId)) imageCache.set(appId, src)
       }}
     />
   )

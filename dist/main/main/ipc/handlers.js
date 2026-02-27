@@ -61,7 +61,7 @@ function setupIpcHandlers(steam, idle) {
     electron_1.ipcMain.handle(types_1.IPC.UNLOCK_ALL_ACHIEVEMENTS, (_e, appId) => wrap(() => steam.setAllAchievements(appId, true)));
     electron_1.ipcMain.handle(types_1.IPC.LOCK_ALL_ACHIEVEMENTS, (_e, appId) => wrap(() => steam.setAllAchievements(appId, false)));
     electron_1.ipcMain.handle(types_1.IPC.RESET_STATS, (_e, appId) => wrap(() => steam.resetAllStats(appId)));
-    electron_1.ipcMain.handle(types_1.IPC.STOP_GAME, () => wrap(() => steam.stopGame()));
+    electron_1.ipcMain.handle(types_1.IPC.STOP_GAME, (_e, appId) => wrap(() => steam.stopGame(appId)));
     // ── Settings ──────────────────────────────────────────────────────────────
     electron_1.ipcMain.handle(types_1.IPC.GET_SETTINGS, () => {
         try {

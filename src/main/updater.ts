@@ -92,14 +92,17 @@ export function performStartupUpdateCheck(
       autoUpdater.downloadUpdate().catch((err: Error) => onError(err))
     }
 
-    const onNotAvailable = () => {
-      onEvent({ type: 'status', text: 'Up to date.' })
+    const runPreloadThenDone = () => {
       if (preload) {
-        // Use the splash window time to preload data in the background
         preload(onEvent).catch(() => {}).finally(() => done())
       } else {
-        setTimeout(done, 600)
+        done()
       }
+    }
+
+    const onNotAvailable = () => {
+      onEvent({ type: 'status', text: 'Up to date.' })
+      runPreloadThenDone()
     }
 
     const onProgress = (p: ProgressInfo) => {
@@ -124,7 +127,9 @@ export function performStartupUpdateCheck(
         text: isNetwork ? 'No internet — skipping update.' : `Update check failed: ${msg}`,
         cls: 'warn',
       })
-      setTimeout(done, 800)
+      // Still run the preload even if the update check failed — the splash
+      // window is already open so we use the time to warm the data cache.
+      runPreloadThenDone()
     }
 
     autoUpdater.on('update-available',     onAvailable)
@@ -133,10 +138,10 @@ export function performStartupUpdateCheck(
     autoUpdater.on('update-downloaded',    onDownloaded)
     autoUpdater.on('error',                onError)
 
-    // Safety timeout — if no event fires within 8s, continue anyway
+    // Safety timeout — if no event fires within 8s, run preload anyway
     timeoutHandle = setTimeout(() => {
       onEvent({ type: 'status', text: 'Update check timed out.', cls: 'warn' })
-      done()
+      runPreloadThenDone()
     }, 8000)
 
     onEvent({ type: 'status', text: 'Checking for updates…' })

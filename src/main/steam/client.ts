@@ -26,13 +26,11 @@
 import { ChildProcess, spawn, execSync } from 'child_process'
 import * as path from 'path'
 import * as fs from 'fs'
-import Store from 'electron-store'
 import axios from 'axios'
 
 import {
   Achievement,
   AppSettings,
-  DEFAULT_SETTINGS,
   SteamGame,
   SteamUser,
 } from '../../shared/types'
@@ -42,32 +40,38 @@ import {
   readLoginUsers,
   AcfApp,
 } from './steamPaths'
+import { getStore } from '../store'
 
 type SteamClientObj = any
 
 // ─── Persistent settings ───────────────────────────────────────────────────
-const store = new Store<{ settings: AppSettings; gamesCache?: { data: SteamGame[]; timestamp: number } }>({
-  name: 'config',           // explicit filename → config.json
-  defaults: { settings: DEFAULT_SETTINGS },
-})
-function getSettings(): AppSettings { return store.get('settings') }
+// Uses the shared lazy singleton from store.ts so that app.setPath('userData')
+// in index.ts is guaranteed to have run before the store is first opened.
+// A local `new Store()` at module-level would be created during the import
+// phase — before app.setPath() executes — and would therefore resolve to the
+// wrong (default Electron) userData directory.
+function getSettings(): AppSettings { return getStore().get('settings') }
 
 // ─── Games cache ────────────────────────────────────────────────────────────
 const CACHE_TTL_MS = 30 * 60 * 1000 // 30 minutes
+// Bump this whenever the shape of cached data changes so stale caches are
+// automatically invalidated on the next launch instead of showing wrong data.
+const CACHE_VERSION = 2
 
 function getCachedGames(): SteamGame[] | null {
-  const cached = store.get('gamesCache') as { data: SteamGame[]; timestamp: number } | undefined
+  const cached = getStore().get('gamesCache')
   if (!cached) return null
+  if ((cached as any).version !== CACHE_VERSION) return null   // schema changed
   if (Date.now() - cached.timestamp > CACHE_TTL_MS) return null
   return cached.data
 }
 
 function setCachedGames(data: SteamGame[]): void {
-  store.set('gamesCache', { data, timestamp: Date.now() })
+  getStore().set('gamesCache', { data, timestamp: Date.now(), version: CACHE_VERSION } as any)
 }
 
 function clearGamesCache(): void {
-  store.delete('gamesCache' as any)
+  getStore().delete('gamesCache')
 }
 
 // ─── Worker bridge ─────────────────────────────────────────────────────────
@@ -82,7 +86,7 @@ class WorkerBridge {
   private pending = new Map<number, PendingCallback>()
   private msgId = 0
   private buffer = ''
-  private currentAppId = 0
+  currentAppId = 0
   private lastApiKey = ''
   // Mutex: prevents concurrent ensure() calls from spawning two workers
   private initPromise: Promise<void> | null = null
@@ -161,7 +165,16 @@ class WorkerBridge {
       }
     })
 
-    await this.send({ type: 'INIT', appId, apiKey: apiKey || undefined }, proc)
+    const INIT_TIMEOUT_MS = 20_000
+    await Promise.race([
+      this.send({ type: 'INIT', appId, apiKey: apiKey || undefined }, proc),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => {
+          try { proc.kill() } catch { /* ok */ }
+          reject(new Error('Steam initialization timed out. Make sure Steam is running.'))
+        }, INIT_TIMEOUT_MS)
+      ),
+    ])
   }
 
   send(msg: Omit<{ id: number; type: string;[k: string]: unknown }, 'id'>, targetProc?: ChildProcess): Promise<unknown> {
@@ -299,8 +312,10 @@ export class SteamClient {
       } catch { /* keep defaults */ }
     }
 
-    if (!avatarUrl && steamId64) {
-      avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(personaName.slice(0, 2).toUpperCase())}&background=1a9fff&color=fff&size=128&bold=true`
+    // Always ensure we have a fallback avatar — even if no steamId was found
+    if (!avatarUrl) {
+      const initials = personaName.slice(0, 2).toUpperCase() || 'ST'
+      avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(initials)}&background=1a9fff&color=fff&size=128&bold=true`
     }
 
     return {
@@ -364,6 +379,7 @@ export class SteamClient {
 
     // ── 3. Fetch full owned games list from Steam Web API ───────────────────
     let steamId64 = settings.steamId || ''
+    const webApiAppIds = new Set<number>()
     if (settings.steamApiKey) {
       try {
         if (!steamId64) {
@@ -380,22 +396,33 @@ export class SteamClient {
 
         for (const wg of webGames) {
           addGame(wg.appid, wg.name, wg.playtime_forever, wg.rtime_last_played)
+          webApiAppIds.add(wg.appid)
         }
 
-        // ── 4. Fetch achievement counts in batches ──────────────────────────
-        const appIdsForStats = Array.from(gamesMap.keys()).filter(id =>
+        // ── 4. Fetch achievement counts ─────────────────────────────────────
+        //
+        // Strategy:
+        //   Pass B — GetPlayerAchievements for played/installed/custom games.
+        //     Fast, accurate unlock counts. Fails on private profiles.
+        //   Pass A — GetSchemaForGame ONLY for games still showing 0 after Pass B.
+        //     Catches private-profile games and games with 0 playtime.
+        //     Smaller set = no rate-limit issues.
+
+        const allGameIds = Array.from(gamesMap.keys())
+
+        // Pass B first: player unlock state for played/installed games
+        const playedIds = allGameIds.filter(id =>
           customAppIds.includes(id) ||
           (gamesMap.get(id)!.playtimeForever > 0) ||
           installed.some(ia => ia.appId === id)
         )
-
-        for (let i = 0; i < appIdsForStats.length; i += 10) {
-          const chunk = appIdsForStats.slice(i, i + 10)
+        for (let i = 0; i < playedIds.length; i += 10) {
+          const chunk = playedIds.slice(i, i + 10)
           await Promise.allSettled(chunk.map(async (appid) => {
             try {
               const achRes = await axios.get(
                 `https://api.steampowered.com/ISteamUserStats/GetPlayerAchievements/v1/?key=${settings.steamApiKey}&steamid=${steamId64}&appid=${appid}`,
-                { timeout: 4000 }
+                { timeout: 5000 }
               )
               const achs: { achieved: number }[] = achRes?.data?.playerstats?.achievements ?? []
               if (achs.length > 0) {
@@ -406,7 +433,28 @@ export class SteamClient {
                   game.achievementPercentage = Math.round((game.achievementsUnlocked / game.achievementCount) * 100)
                 }
               }
-            } catch { /* game has no stats or private profile */ }
+            } catch { /* private profile or no stats — Pass A will cover these */ }
+          }))
+        }
+
+        // Pass A: schema fallback for any played/installed game still showing 0
+        // (private profile, API error, etc). NOT run for unplayed games to
+        // avoid hammering the API with hundreds of requests.
+        const stillZeroIds = playedIds.filter(id => gamesMap.get(id)!.achievementCount === 0)
+        for (let i = 0; i < stillZeroIds.length; i += 10) {
+          const chunk = stillZeroIds.slice(i, i + 10)
+          await Promise.allSettled(chunk.map(async (appid) => {
+            try {
+              const schRes = await axios.get(
+                `https://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/?key=${settings.steamApiKey}&appid=${appid}&l=english`,
+                { timeout: 6000 }
+              )
+              const achs: unknown[] = schRes?.data?.game?.availableGameStats?.achievements ?? []
+              if (achs.length > 0) {
+                const game = gamesMap.get(appid)
+                if (game) game.achievementCount = achs.length
+              }
+            } catch { /* game genuinely has no achievements */ }
           }))
         }
       } catch (e) {
@@ -415,13 +463,14 @@ export class SteamClient {
     }
 
     // ── 5. Final filter ─────────────────────────────────────────────────────
-    const hasAnyStats = Array.from(gamesMap.values()).some(g => g.achievementCount > 0)
     let finalGames = Array.from(gamesMap.values())
 
-    if (settings.steamApiKey && hasAnyStats) {
+    // Only show games that have achievements, or are explicitly added via
+    // customAppIds (user may want to idle a game with no achievements).
+    const hasAnyStats = finalGames.some(g => g.achievementCount > 0)
+    if (hasAnyStats) {
       finalGames = finalGames.filter(g =>
-        g.achievementCount > 0 ||
-        customAppIds.includes(g.appId)
+        g.achievementCount > 0 || customAppIds.includes(g.appId)
       )
     }
 
@@ -452,7 +501,12 @@ export class SteamClient {
   }
 
   // ── Stop current game (kill worker) ────────────────────────────────────────
-  async stopGame(): Promise<void> {
+  // Accepts an optional appId — if provided, only kills the worker if it is
+  // still running *that* game. This prevents a delayed cleanup from a
+  // previously-viewed game from killing the worker that was just spawned for
+  // the new game the user navigated to.
+  async stopGame(appId?: number): Promise<void> {
+    if (appId !== undefined && worker.currentAppId !== appId) return
     await worker.kill()
   }
 
