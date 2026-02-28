@@ -182,7 +182,7 @@ export default function GamesPage() {
   const [search, setSearch]     = useState('')
   const [sortBy, setSortBy]     = useState<SortKey>('playtime')
   const [filter, setFilter]     = useState<FilterKey>('all')
-  const [view, setView]         = useState<ViewMode>('grid')
+  const [view, setView]         = useState<ViewMode>('list')
   const [showFilters, setShowFilters] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
   const navigate  = useNavigate()

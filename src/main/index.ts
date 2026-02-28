@@ -166,6 +166,10 @@ async function runSplashFlow(onReady: () => void): Promise<void> {
 
         emit({ type: 'status',   text: 'Loading library…' })
         await steamClient.getOwnedGames().catch(() => null)
+        emit({ type: 'progress', percent: 75 })
+
+        emit({ type: 'status',   text: 'Loading recent games…' })
+        await steamClient.getRecentGames().catch(() => null)
         emit({ type: 'progress', percent: 92 })
       } else {
         emit({ type: 'status',   text: 'Steam not running — launching anyway…' })

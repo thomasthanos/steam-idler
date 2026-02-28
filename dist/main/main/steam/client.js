@@ -348,6 +348,49 @@ class SteamClient {
             level,
         };
     }
+    // ── Recent Games ──────────────────────────────────────────────────────────
+    async getRecentGames() {
+        // Try GetRecentlyPlayedGames (last 2 weeks) from Web API first.
+        // Falls back to deriving from owned games cache sorted by lastPlayed.
+        const settings = getSettings();
+        let steamId64 = settings.steamId || '';
+        if (settings.steamApiKey) {
+            try {
+                const steamPath = (0, steamPaths_1.getSteamPath)();
+                if (!steamId64) {
+                    const users = (0, steamPaths_1.readLoginUsers)(steamPath);
+                    if (users[0])
+                        steamId64 = users[0].steamId64;
+                }
+                if (steamId64) {
+                    const res = await axios_1.default.get(`https://api.steampowered.com/IPlayerService/GetRecentlyPlayedGames/v1/?key=${settings.steamApiKey}&steamid=${steamId64}&count=10`, { timeout: 8000 });
+                    const webGames = res?.data?.response?.games ?? [];
+                    if (webGames.length > 0) {
+                        return webGames.map(g => ({
+                            appId: g.appid,
+                            name: g.name,
+                            iconUrl: `https://cdn.cloudflare.steamstatic.com/steam/apps/${g.appid}/capsule_231x87.jpg`,
+                            headerImageUrl: `https://cdn.cloudflare.steamstatic.com/steam/apps/${g.appid}/header.jpg`,
+                            playtimeForever: g.playtime_forever,
+                            playtime2Weeks: g.playtime_2weeks,
+                            achievementCount: 0, achievementsUnlocked: 0, achievementPercentage: 0,
+                            lastPlayed: g.rtime_last_played ?? 0,
+                        }));
+                    }
+                }
+            }
+            catch { /* fall through to cache */ }
+        }
+        // Fallback: derive from owned games cache
+        const cached = getCachedGames();
+        if (cached) {
+            return [...cached]
+                .filter(g => (g.lastPlayed ?? 0) > 0)
+                .sort((a, b) => (b.lastPlayed ?? 0) - (a.lastPlayed ?? 0))
+                .slice(0, 10);
+        }
+        return [];
+    }
     // ── Owned Games ───────────────────────────────────────────────────────────
     async getOwnedGames(force = false) {
         if (!force) {

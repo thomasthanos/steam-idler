@@ -8,6 +8,7 @@ exports.IPC = {
     GET_USER_INFO: 'steam:get-user-info',
     // Games
     GET_OWNED_GAMES: 'steam:get-owned-games',
+    GET_RECENT_GAMES: 'steam:get-recent-games',
     // Achievements
     GET_ACHIEVEMENTS: 'steam:get-achievements',
     UNLOCK_ACHIEVEMENT: 'steam:unlock-achievement',

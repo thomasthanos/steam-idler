@@ -10,6 +10,7 @@ interface AppContextType {
   isLoadingUser: boolean
   games: SteamGame[]
   isLoadingGames: boolean
+  recentGames: SteamGame[]
   fetchGames: (force?: boolean) => Promise<void>
   updateSettings: (s: Partial<AppSettings>) => Promise<void>
   refreshUser: () => Promise<void>
@@ -25,6 +26,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [games, setGames] = useState<SteamGame[]>([])
   const [isLoadingGames, setIsLoadingGames] = useState(false)
   const [gamesFetched, setGamesFetched] = useState(false)
+  const [recentGames, setRecentGames] = useState<SteamGame[]>([])
 
   // Fix #7 – Request deduplication for rapid settings saves.
   // Holds the timer id for the pending debounced flush.
@@ -129,6 +131,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (settingsRes.success && settingsRes.data) setSettings(settingsRes.data)
       // Games were preloaded into cache — fetchGames() returns from cache immediately
       fetchGames()
+      // Recent games were preloaded during splash — fetch immediately from cache
+      window.steam.getRecentGames().then(res => {
+        if (res.success && res.data) setRecentGames(res.data)
+      }).catch(() => {})
     }
     init()
 
@@ -156,7 +162,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   return (
     <AppContext.Provider value={{
       user, steamRunning, settings, isLoadingUser,
-      games, isLoadingGames, fetchGames,
+      games, isLoadingGames, recentGames, fetchGames,
       updateSettings, refreshUser,
     }}>
       {children}

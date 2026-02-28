@@ -54,6 +54,7 @@ function setupIpcHandlers(steam, idle) {
     electron_1.ipcMain.handle(types_1.IPC.GET_USER_INFO, () => wrap(() => steam.getUserInfo()));
     // ── Games ─────────────────────────────────────────────────────────────────
     electron_1.ipcMain.handle(types_1.IPC.GET_OWNED_GAMES, (_e, force) => wrap(() => steam.getOwnedGames(force)));
+    electron_1.ipcMain.handle(types_1.IPC.GET_RECENT_GAMES, () => wrap(() => steam.getRecentGames()));
     // ── Achievements ──────────────────────────────────────────────────────────
     electron_1.ipcMain.handle(types_1.IPC.GET_ACHIEVEMENTS, (_e, appId) => wrap(() => steam.getAchievements(appId)));
     electron_1.ipcMain.handle(types_1.IPC.UNLOCK_ACHIEVEMENT, (_e, appId, apiName) => wrap(() => steam.setAchievement(appId, apiName, true)));

@@ -9,6 +9,7 @@ const steamAPI = {
     getUserInfo: () => electron_1.ipcRenderer.invoke(types_1.IPC.GET_USER_INFO),
     // Games
     getOwnedGames: (force) => electron_1.ipcRenderer.invoke(types_1.IPC.GET_OWNED_GAMES, force),
+    getRecentGames: () => electron_1.ipcRenderer.invoke(types_1.IPC.GET_RECENT_GAMES),
     // Achievements
     getAchievements: (appId) => electron_1.ipcRenderer.invoke(types_1.IPC.GET_ACHIEVEMENTS, appId),
     unlockAchievement: (appId, apiName) => electron_1.ipcRenderer.invoke(types_1.IPC.UNLOCK_ACHIEVEMENT, appId, apiName),

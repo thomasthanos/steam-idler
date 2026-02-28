@@ -56,6 +56,13 @@
 @layer base {
   * { box-sizing: border-box; }
 
+  a, button, img {
+    -webkit-user-drag: none;
+    user-drag: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
   html, body, #root { height: 100%; overflow: hidden; }
 
   body {

@@ -14,6 +14,9 @@ const steamAPI = {
   getOwnedGames: (force?: boolean): Promise<IPCResponse<SteamGame[]>> =>
     ipcRenderer.invoke(IPC.GET_OWNED_GAMES, force),
 
+  getRecentGames: (): Promise<IPCResponse<SteamGame[]>> =>
+    ipcRenderer.invoke(IPC.GET_RECENT_GAMES),
+
   // Achievements
   getAchievements: (appId: number): Promise<IPCResponse<Achievement[]>> =>
     ipcRenderer.invoke(IPC.GET_ACHIEVEMENTS, appId),

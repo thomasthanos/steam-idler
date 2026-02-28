@@ -28,6 +28,10 @@ export function setupIpcHandlers(steam: SteamClient, idle: IdleManager): void {
     wrap(() => steam.getOwnedGames(force))
   )
 
+  ipcMain.handle(IPC.GET_RECENT_GAMES, () =>
+    wrap(() => steam.getRecentGames())
+  )
+
   // ── Achievements ──────────────────────────────────────────────────────────
   ipcMain.handle(IPC.GET_ACHIEVEMENTS, (_e, appId: number) =>
     wrap(() => steam.getAchievements(appId))
