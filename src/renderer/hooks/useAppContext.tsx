@@ -1,5 +1,5 @@
 // @refresh reset
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react'
 import { SteamUser, AppSettings, DEFAULT_SETTINGS, SteamGame } from '@shared/types'
 import toast from 'react-hot-toast'
 
@@ -25,6 +25,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [games, setGames] = useState<SteamGame[]>([])
   const [isLoadingGames, setIsLoadingGames] = useState(false)
   const [gamesFetched, setGamesFetched] = useState(false)
+
+  // Fix #7 – Request deduplication for rapid settings saves.
+  // Holds the timer id for the pending debounced flush.
+  const saveTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Accumulates partial updates that haven't been flushed yet.
+  const pendingSaveRef = useRef<Partial<AppSettings>>({})
 
   const refreshUser = useCallback(async () => {
     setIsLoadingUser(true)
@@ -60,32 +66,56 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [gamesFetched])
 
-  const updateSettings = async (partial: Partial<AppSettings>) => {
-    const prev = settings
-    const next = { ...settings, ...partial }
-    setSettings(next)  // optimistic update
-    const res = await window.steam.setSettings(partial)
-    if (!res.success) {
-      setSettings(prev)  // rollback on failure
-      throw new Error(res.error ?? 'Failed to save settings')
-    }
-    const gameRelatedKeys: (keyof AppSettings)[] = ['customAppIds', 'steamApiKey', 'steamId']
-    if (gameRelatedKeys.some((k) => k in partial)) {
-      // Fire in background — do NOT await so the Settings page isn't frozen
-      // while getOwnedGames() makes dozens of Steam Web API calls.
-      // GamesPage shows its own loading skeleton via isLoadingGames.
-      setIsLoadingGames(true)
-      window.steam.getOwnedGames(true)
-        .then(res => {
-          if (res.success && res.data) {
-            setGames(res.data)
-            setGamesFetched(true)
+  const updateSettings = useCallback(async (partial: Partial<AppSettings>) => {
+    // --- Optimistic UI update (immediate) ---
+    setSettings(prev => ({ ...prev, ...partial }))
+
+    // --- Deduplication: merge this partial into the pending batch ---
+    pendingSaveRef.current = { ...pendingSaveRef.current, ...partial }
+
+    // If a flush is already scheduled, reschedule it so we coalesce rapid
+    // calls (e.g. toggling several toggles in quick succession) into one IPC.
+    if (saveTimerRef.current !== null) clearTimeout(saveTimerRef.current)
+
+    await new Promise<void>((resolve, reject) => {
+      saveTimerRef.current = setTimeout(async () => {
+        saveTimerRef.current = null
+        const batch = pendingSaveRef.current
+        pendingSaveRef.current = {}
+
+        try {
+          const res = await window.steam.setSettings(batch)
+          if (!res.success) {
+            // Roll back just the keys that were in this batch
+            setSettings(prev => {
+              const rolled: Partial<AppSettings> = {}
+              for (const k of Object.keys(batch) as (keyof AppSettings)[]) {
+                ;(rolled as Record<string, unknown>)[k] = prev[k]
+              }
+              return { ...prev, ...rolled }
+            })
+            reject(new Error(res.error ?? 'Failed to save settings'))
+            return
           }
-        })
-        .catch(() => { /* silent */ })
-        .finally(() => setIsLoadingGames(false))
-    }
-  }
+
+          const gameRelatedKeys: (keyof AppSettings)[] = ['customAppIds', 'steamApiKey', 'steamId']
+          if (gameRelatedKeys.some((k) => k in batch)) {
+            setIsLoadingGames(true)
+            window.steam.getOwnedGames(true)
+              .then(r => {
+                if (r.success && r.data) { setGames(r.data); setGamesFetched(true) }
+              })
+              .catch(() => { /* silent */ })
+              .finally(() => setIsLoadingGames(false))
+          }
+
+          resolve()
+        } catch (e) {
+          reject(e)
+        }
+      }, 150)  // 150 ms debounce window
+    })
+  }, [])
 
   useEffect(() => {
     // Fire all startup requests in parallel — main process has preloaded

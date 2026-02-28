@@ -316,10 +316,14 @@ function createTray() {
                 mainWindow?.focus();
             }
         });
-        // Store interval ID so we can clear it in forceQuit()
+        // Fix #10 – update the tray immediately whenever idle state changes
+        // (e.g. a game starts or stops), without waiting for the polling interval.
+        exports.idleManager.on('changed', updateMenu);
+        // Keep a slower poll as a safety net (handles edge-cases like process crashes
+        // where the 'exit' event may arrive after a delay).
         if (trayUpdateInterval)
             clearInterval(trayUpdateInterval);
-        trayUpdateInterval = setInterval(updateMenu, 5000);
+        trayUpdateInterval = setInterval(updateMenu, 10000);
     }
     catch (e) {
         console.error('[tray] Failed to create tray:', e);
@@ -466,6 +470,7 @@ function forceQuit() {
         clearInterval(trayUpdateInterval);
         trayUpdateInterval = null;
     }
+    exports.idleManager.removeAllListeners('changed');
     tray?.destroy();
     tray = null;
     exports.idleManager.stopAll();

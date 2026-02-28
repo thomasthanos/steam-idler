@@ -1,9 +1,10 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import { useTheme } from './hooks/useTheme'
 import TitleBar from './components/TitleBar'
 import Sidebar from './components/Sidebar'
 import UpdateBanner from './components/UpdateBanner'
+import ErrorBoundary from './components/ErrorBoundary'
 import HomePage from './pages/HomePage'
 import GamesPage from './pages/GamesPage'
 import AchievementsPage from './pages/AchievementsPage'
@@ -18,6 +19,7 @@ import { useEffect } from 'react'
 function AppShell() {
   useTheme()
   const { refreshUser } = useAppContext()
+  const location = useLocation()
 
   // Global keyboard shortcut: Ctrl+R → refresh Steam connection
   useEffect(() => {
@@ -38,6 +40,11 @@ function AppShell() {
       <div className="flex flex-1 overflow-hidden">
         <Sidebar />
         <main className="flex-1 overflow-hidden relative" style={{ background: 'var(--bg)' }}>
+          {/* Fix #6 – per-route error boundary so one crashed page doesn't
+              take down the shell (titlebar, sidebar, tray still work). */}
+          {/* key resets the boundary on route change so a crashed page
+              clears its error state when the user navigates elsewhere. */}
+          <ErrorBoundary label="page" key={location.pathname}>
           <Routes>
             <Route path="/" element={<Navigate to="/home" replace />} />
             <Route path="/home" element={<HomePage />} />
@@ -48,6 +55,7 @@ function AppShell() {
             <Route path="/auto-idle" element={<AutoIdlePage />} />
             <Route path="/portfolio" element={<PortfolioPage />} />
           </Routes>
+          </ErrorBoundary>
         </main>
       </div>
 

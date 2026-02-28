@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Settings, Moon, Sun, Monitor, Key, Shield, Bell, Eye, Power, Volume2, RefreshCw, Download, CheckCircle, ExternalLink, AlertCircle } from 'lucide-react'
-import { AppSettings, PartnerAppRelease, PartnerAppDownloadProgress } from '@shared/types'
+import { Settings, Moon, Sun, Monitor, Key, Shield, Bell, Eye, Power, Volume2 } from 'lucide-react'
+import { AppSettings } from '@shared/types'
 import { useAppContext } from '../hooks/useAppContext'
 import { applyTheme } from '../hooks/useTheme'
 import toast from 'react-hot-toast'
@@ -60,34 +60,6 @@ export default function SettingsPage() {
     } catch {
       toast.error('Error updating startup')
     }
-  }
-
-  // ── Partner apps state ────────────────────────────────────────────────────────────
-  const [partnerReleases, setPartnerReleases] = useState<Record<string, PartnerAppRelease>>({})
-  const [partnerProgress, setPartnerProgress] = useState<Record<string, PartnerAppDownloadProgress>>({})
-
-  useEffect(() => {
-    window.steam.getPartnerAppReleases().then(res => {
-      if (res.success && res.data) {
-        const map: Record<string, PartnerAppRelease> = {}
-        for (const r of res.data) map[r.key] = r
-        setPartnerReleases(map)
-      }
-    }).catch(() => {})
-
-    const unsub = window.steam.onPartnerAppDownloadProgress(p => {
-      setPartnerProgress(prev => ({ ...prev, [p.key]: p }))
-      if (p.done && !p.error) toast.success('Download complete — installer launched!')
-      if (p.done && p.error) toast.error(`Download failed: ${p.error}`)
-    })
-    return unsub
-  }, [])
-
-  const handlePartnerDownload = async (key: string) => {
-    const rel = partnerReleases[key]
-    if (!rel) return
-    setPartnerProgress(prev => ({ ...prev, [key]: { key, percent: 0, done: false } }))
-    await window.steam.downloadPartnerApp(key, rel.downloadUrl, rel.fileName)
   }
 
   const behaviorToggles = [
@@ -328,157 +300,6 @@ export default function SettingsPage() {
               </button>
             </div>
           ))}
-        </section>
-
-        {/* ── More Apps by ThomasThanos ── */}
-        <section className="card space-y-1 !p-0 overflow-hidden">
-          {/* Header */}
-          <div className="flex items-center gap-2 px-4 pt-4 pb-3" style={{ borderBottom: '1px solid var(--border)' }}>
-            <ExternalLink className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
-            <h2 className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--muted)' }}>More Apps by ThomasThanos</h2>
-          </div>
-
-          {[
-            {
-              key: 'myle',
-              name: 'Make Your Life Easier',
-              desc: 'Password manager, system tools & more',
-              accent: '#7c3aed',
-              bg: 'rgba(124,58,237,0.12)',
-              border: 'rgba(124,58,237,0.25)',
-              icon: (
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                  <rect x="3" y="11" width="18" height="11" rx="2" stroke="#7c3aed" strokeWidth="1.8"/>
-                  <path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="#7c3aed" strokeWidth="1.8" strokeLinecap="round"/>
-                  <circle cx="12" cy="16" r="1.5" fill="#7c3aed"/>
-                </svg>
-              ),
-            },
-            {
-              key: 'gbr',
-              name: 'GitHub Build & Release',
-              desc: 'GUI για build & διαχείριση GitHub releases',
-              accent: '#3b82f6',
-              bg: 'rgba(59,130,246,0.10)',
-              border: 'rgba(59,130,246,0.25)',
-              icon: (
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                  <path d="M12 2C6.477 2 2 6.477 2 12c0 4.418 2.865 8.166 6.839 9.489.5.092.682-.217.682-.482 0-.237-.009-.868-.013-1.703-2.782.604-3.369-1.342-3.369-1.342-.454-1.154-1.11-1.462-1.11-1.462-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.831.092-.646.35-1.086.636-1.336-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.564 9.564 0 0 1 12 6.844a9.59 9.59 0 0 1 2.504.337c1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.578.688.48C19.138 20.163 22 16.418 22 12c0-5.523-4.477-10-10-10z" fill="#3b82f6"/>
-                </svg>
-              ),
-            },
-            {
-              key: 'backup',
-              name: 'Backup Projects',
-              desc: 'Αυτόματο backup projects με ένα κλικ',
-              accent: '#10b981',
-              bg: 'rgba(16,185,129,0.10)',
-              border: 'rgba(16,185,129,0.25)',
-              icon: (
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke="#10b981" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                  <polyline points="17 8 12 3 7 8" stroke="#10b981" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                  <line x1="12" y1="3" x2="12" y2="15" stroke="#10b981" strokeWidth="1.8" strokeLinecap="round"/>
-                </svg>
-              ),
-            },
-            {
-              key: 'discordviewer',
-              name: 'Discord Package Viewer',
-              desc: 'Ανάλυση του Discord data package σου',
-              accent: '#5865f2',
-              bg: 'rgba(88,101,242,0.10)',
-              border: 'rgba(88,101,242,0.25)',
-              icon: (
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                  <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057c.002.022.015.043.03.056a19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z" fill="#5865f2"/>
-                </svg>
-              ),
-            },
-          ].map(({ key, name, desc, accent, bg, border, icon }, idx, arr) => {
-            const rel = partnerReleases[key]
-            const prog = partnerProgress[key]
-            const isDownloading = prog && !prog.done
-            const isDone = prog?.done && !prog.error
-            const isError = prog?.done && !!prog.error
-            const isLast = idx === arr.length - 1
-
-            return (
-              <div key={key}>
-                <div
-                  className="flex items-center gap-3 px-4 py-3 transition-colors duration-150"
-                  style={{ background: 'transparent' }}
-                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--hover-overlay, rgba(255,255,255,0.03))')}
-                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                >
-                  {/* Icon bubble */}
-                  <div
-                    className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                    style={{ background: bg, border: `1px solid ${border}` }}
-                  >
-                    {icon}
-                  </div>
-
-                  {/* Name + desc */}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium leading-tight truncate" style={{ color: 'var(--text)' }}>{name}</p>
-                    <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--muted)' }}>{desc}</p>
-                  </div>
-
-                  {/* Version badge */}
-                  {rel && !isDownloading && !isDone && !isError && (
-                    <span
-                      className="text-xs font-mono px-2 py-0.5 rounded-full shrink-0"
-                      style={{ background: bg, color: accent, border: `1px solid ${border}` }}
-                    >
-                      v{rel.version}
-                    </span>
-                  )}
-
-                  {/* Progress inline */}
-                  {isDownloading && (
-                    <div className="flex items-center gap-2 shrink-0">
-                      <div className="w-20 h-1 rounded-full overflow-hidden" style={{ background: 'var(--border)' }}>
-                        <div
-                          className="h-full rounded-full transition-all duration-200"
-                          style={{ width: `${prog.percent}%`, background: accent }}
-                        />
-                      </div>
-                      <span className="text-xs tabular-nums" style={{ color: accent }}>{prog.percent}%</span>
-                    </div>
-                  )}
-
-                  {/* Action button */}
-                  <button
-                    onClick={() => handlePartnerDownload(key)}
-                    disabled={isDownloading || isDone}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium shrink-0 transition-all duration-150 disabled:opacity-60 disabled:cursor-not-allowed"
-                    style={
-                      isDone
-                        ? { background: 'rgba(34,197,94,0.12)', color: 'var(--green)', border: '1px solid rgba(34,197,94,0.25)' }
-                        : isError
-                        ? { background: 'rgba(239,68,68,0.10)', color: 'var(--red)', border: '1px solid rgba(239,68,68,0.22)' }
-                        : { background: bg, color: accent, border: `1px solid ${border}` }
-                    }
-                  >
-                    {isDownloading && <RefreshCw className="w-3 h-3 animate-spin" />}
-                    {isDone        && <CheckCircle className="w-3 h-3" />}
-                    {isError       && <AlertCircle className="w-3 h-3" />}
-                    {!isDownloading && !isDone && !isError && <Download className="w-3 h-3" />}
-                    <span>
-                      {isDownloading ? 'Downloading…' : isDone ? 'Installed' : isError ? 'Retry' : 'Download'}
-                    </span>
-                  </button>
-                </div>
-
-                {!isLast && (
-                  <div style={{ height: '1px', background: 'var(--border)', margin: '0 16px' }} />
-                )}
-              </div>
-            )
-          })}
-
-          <div className="pb-1" />
         </section>
 
       </div>

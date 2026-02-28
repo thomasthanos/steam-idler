@@ -59,6 +59,14 @@ export default function AutoIdlePage() {
     finally   { setSearching(false) }
   }, [])
 
+  // Fix #2 – clear the debounce timer when the component unmounts so we don't
+  // update state on an already-unmounted component.
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+    }
+  }, [])
+
   const handleSearchInput = (val: string) => {
     setSearchQuery(val)
     if (debounceRef.current) clearTimeout(debounceRef.current)

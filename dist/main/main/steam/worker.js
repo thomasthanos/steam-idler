@@ -38,9 +38,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.STATS_NOT_RECEIVED_SENTINEL = void 0;
 const sw = __importStar(require("steamworks.js"));
-// runCallbacks may be a named export depending on the steamworks.js version
-const { runCallbacks } = sw;
 const axios_1 = __importDefault(require("axios"));
+// runCallbacks is typed via src/main/steam/steamworks-types.d.ts (module augmentation).
+// That file is a compile-time-only .d.ts — no runtime import needed or possible.
+const { runCallbacks } = sw;
 // ─── State ──────────────────────────────────────────────────────────────────
 let client = null;
 let currentAppId = 0;

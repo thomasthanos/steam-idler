@@ -1,3 +1,12 @@
+/**
+ * GameImage.tsx
+ *
+ * Fix #8 – Replace the unbounded module-level Map with an LRU cache so
+ *          memory doesn't grow indefinitely when a user browses a large Steam
+ *          library.  The cache is capped at MAX_CACHE_SIZE entries; the least-
+ *          recently-used entry is evicted when the cap is reached.
+ */
+
 import { useState, memo, useEffect, useRef } from 'react'
 
 interface GameImageProps {
@@ -7,20 +16,49 @@ interface GameImageProps {
 }
 
 // Steam CDN image candidates, tried in order.
-// header.jpg         → 460×215 — most common, present on virtually all games
-// capsule_231x87.jpg → smaller capsule, present on most games
-// capsule_sm_120.jpg intentionally omitted — almost never exists on the CDN
-//                    and only adds 404 noise to the browser console.
 const getCandidates = (appId: number) => [
   `https://cdn.cloudflare.steamstatic.com/steam/apps/${appId}/header.jpg`,
   `https://cdn.cloudflare.steamstatic.com/steam/apps/${appId}/capsule_231x87.jpg`,
 ]
 
-// Module-level cache so results persist across remounts and page navigation.
-// Stores either the first working URL, or null if all candidates failed.
-const imageCache = new Map<number, string | null>()
+// ── LRU Cache ────────────────────────────────────────────────────────────────
+// Stores either the first working URL (string) or null (all candidates failed).
+// The insertion-order of Map entries is exploited: the oldest entry is always
+// `map.keys().next().value`.
 
-// Deterministic letter avatar — zero HTTP requests
+const MAX_CACHE_SIZE = 500
+
+class LRUCache<K, V> {
+  private map = new Map<K, V>()
+
+  get(key: K): V | undefined {
+    if (!this.map.has(key)) return undefined
+    const val = this.map.get(key)!
+    // Move to end (most-recently-used position)
+    this.map.delete(key)
+    this.map.set(key, val)
+    return val
+  }
+
+  set(key: K, val: V): void {
+    if (this.map.has(key)) this.map.delete(key)
+    this.map.set(key, val)
+    if (this.map.size > MAX_CACHE_SIZE) {
+      // Evict least-recently-used (first) entry
+      const oldest = this.map.keys().next().value
+      if (oldest !== undefined) this.map.delete(oldest)
+    }
+  }
+
+  has(key: K): boolean {
+    return this.map.has(key)
+  }
+}
+
+// Module-level so results persist across remounts and page navigation.
+const imageCache = new LRUCache<number, string | null>()
+
+// ── Letter avatar ─────────────────────────────────────────────────────────────
 function LetterAvatar({ name }: { name: string }) {
   const letter = (name.trim().charAt(0) || '?').toUpperCase()
   let hash = 0
@@ -37,7 +75,6 @@ function LetterAvatar({ name }: { name: string }) {
 }
 
 const GameImage = memo(({ appId, name, className = '' }: GameImageProps) => {
-  // Check cache first — avoids re-firing 404 requests on remount/re-render
   const cached = imageCache.get(appId)
   const candidates = getCandidates(appId)
 
@@ -45,11 +82,9 @@ const GameImage = memo(({ appId, name, className = '' }: GameImageProps) => {
   const [src, setSrc] = useState<string>(cached !== undefined && cached !== null ? cached : candidates[0])
   const [failed, setFailed] = useState<boolean>(cached === null)
 
-  // Reset when appId changes, respecting cache
   useEffect(() => {
     const hit = imageCache.get(appId)
     if (hit !== undefined) {
-      // Already resolved: jump straight to known-good URL or letter avatar
       indexRef.current = 0
       setSrc(hit ?? candidates[0])
       setFailed(hit === null)
@@ -73,16 +108,14 @@ const GameImage = memo(({ appId, name, className = '' }: GameImageProps) => {
         indexRef.current = next
         const nextUrl = getCandidates(appId)[next]
         if (nextUrl) {
-          setSrc(nextUrl)   // try next candidate silently
+          setSrc(nextUrl)
         } else {
-          // All candidates exhausted — cache the failure so we never retry
           imageCache.set(appId, null)
           setFailed(true)
         }
       }}
       onLoad={() => {
-        // Cache the first URL that loads successfully
-        if (!imageCache.has(appId)) imageCache.set(appId, src)
+        if (imageCache.get(appId) === undefined) imageCache.set(appId, src)
       }}
     />
   )

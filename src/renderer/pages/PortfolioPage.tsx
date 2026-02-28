@@ -31,7 +31,7 @@ const apps: AppInfo[] = [
         accentRgb: '167,139,250',
         badge: 'Popular',
         category: 'utility',
-        githubSlug: 'myle',
+        githubSlug: 'Make_Your_Life_Easier.A.E',
         features: [
             { icon: '🔐', text: 'Password manager with AES-256 encryption' },
             { icon: '📁', text: 'System cleaner & optimizer' },
@@ -58,7 +58,7 @@ const apps: AppInfo[] = [
         accentRgb: '96,165,250',
         badge: 'New',
         category: 'developer',
-        githubSlug: 'gbr',
+        githubSlug: 'Github-Build-Release',
         features: [
             { icon: '🚀', text: 'One-click release creation' },
             { icon: '📦', text: 'Multi-platform builds (Win/Mac/Linux)' },
@@ -82,7 +82,7 @@ const apps: AppInfo[] = [
         accent: '#34d399',
         accentRgb: '52,211,153',
         category: 'utility',
-        githubSlug: 'backup-projects',
+        githubSlug: 'backup_projects',
         features: [
             { icon: '💾', text: 'Incremental — 90% less storage used' },
             { icon: '🔒', text: 'AES-256 encryption' },
@@ -108,7 +108,7 @@ const apps: AppInfo[] = [
         accent: '#818cf8',
         accentRgb: '129,140,248',
         category: 'productivity',
-        githubSlug: 'discord-package-viewer',
+        githubSlug: 'discord_package_viewer',
         features: [
             { icon: '📊', text: 'Message statistics & graphs' },
             { icon: '📈', text: 'Activity heatmaps' },

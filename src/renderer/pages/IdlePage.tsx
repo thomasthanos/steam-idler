@@ -6,12 +6,6 @@ import GameImage from '../components/GameImage'
 import toast from 'react-hot-toast'
 import clsx from 'clsx'
 
-interface IdlingGame {
-  appId: number
-  name: string
-  startedAt: number
-}
-
 export default function IdlePage() {
   const { games, settings } = useAppContext()
 
@@ -36,7 +30,7 @@ export default function IdlePage() {
         setIdlingSince(map)
       }
     })
-    // Update clock every second for elapsed time display
+    // Fix #2 – cleanup the interval on unmount
     const t = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(t)
   }, [])
@@ -67,8 +61,8 @@ export default function IdlePage() {
       } else {
         toast.error(res.error ?? 'Failed to start idling')
       }
-    } catch (e: any) {
-      toast.error(e.message ?? 'Error')
+    } catch (e: unknown) {
+      toast.error((e as Error).message ?? 'Error')
     } finally {
       setLoading(l => ({ ...l, [appId]: false }))
     }
@@ -91,8 +85,8 @@ export default function IdlePage() {
       } else {
         toast.error(res.error ?? 'Failed to stop')
       }
-    } catch (e: any) {
-      toast.error(e.message ?? 'Error')
+    } catch (e: unknown) {
+      toast.error((e as Error).message ?? 'Error')
     } finally {
       setLoading(l => ({ ...l, [appId]: false }))
     }
@@ -102,7 +96,7 @@ export default function IdlePage() {
   const currentlyIdling = idlingIds
     .map(id => {
       const g = games.find(x => x.appId === id)
-      return g ? { appId: id, name: g.name, headerImageUrl: g.headerImageUrl } : { appId: id, name: `App ${id}`, headerImageUrl: undefined }
+      return g ? { appId: id, name: g.name } : { appId: id, name: `App ${id}` }
     })
 
   return (

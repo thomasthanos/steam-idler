@@ -6,6 +6,33 @@
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' https: data: blob:; connect-src 'self' https://api.steampowered.com https://cdn.cloudflare.steamstatic.com https://media.steampowered.com https://steamcommunity.com https://store.steampowered.com https://ui-avatars.com" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <title>Souvlatzidiko-Unlocker</title>
+
+    <!--
+      Fix #5 – Synchronous theme script.
+      Runs BEFORE React hydrates so the html element already has the correct
+      class ('dark' or 'light') when the first CSS paint happens, eliminating
+      the flash-of-wrong-theme (FOUT) that occurred when the async IPC call in
+      useTheme() resolved after the initial render.
+
+      The key '__suv_theme' matches THEME_STORAGE_KEY in useTheme.ts.
+      Possible stored values: 'dark' | 'light' | 'system'.
+    -->
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem('__suv_theme') || 'dark'
+          var resolved = stored === 'light'
+            ? 'light'
+            : stored === 'system'
+              ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+              : 'dark'
+          document.documentElement.classList.add(resolved)
+        } catch (_) {
+          // localStorage may be unavailable in some sandboxed contexts — default to dark
+          document.documentElement.classList.add('dark')
+        }
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

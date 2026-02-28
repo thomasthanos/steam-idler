@@ -2,18 +2,25 @@
  * idleManager.ts – manages "idling" worker processes.
  * Each game gets its own child process with SteamAppId set,
  * so Steam shows the game as "currently playing."
+ *
+ * Fix #1  – tree-kill ensures the entire process tree (not just the root pid)
+ *           is terminated on stopIdle.  Without this, child processes spawned
+ *           by the worker (native addons, etc.) could linger after proc.kill().
+ * Fix #10 – IdleManager extends EventEmitter so the main window can subscribe
+ *           to 'changed' events and update the tray icon immediately instead of
+ *           waiting for the 5 s polling interval.
  */
 
 import { ChildProcess, spawn } from 'child_process'
 import * as path from 'path'
+import { EventEmitter } from 'events'
+import treeKill from 'tree-kill'
 
-export class IdleManager {
+export class IdleManager extends EventEmitter {
   private idlers = new Map<number, ChildProcess>()
   private names  = new Map<number, string>()
 
   private get workerPath(): string {
-    // In a packaged app, worker.js is extracted from app.asar into
-    // app.asar.unpacked so it can be spawned as a child process.
     return path.join(__dirname, 'worker.js')
       .replace('app.asar' + path.sep, 'app.asar.unpacked' + path.sep)
   }
@@ -29,7 +36,10 @@ export class IdleManager {
         ELECTRON_RUN_AS_NODE: '1',
         ELECTRON_NO_ASAR: '1',
       },
+      // detached: false keeps the child in the same session so tree-kill can
+      // walk the full process tree on all platforms.
       stdio: ['pipe', 'pipe', 'pipe'],
+      detached: false,
     })
 
     proc.stderr?.setEncoding('utf8')
@@ -37,27 +47,46 @@ export class IdleManager {
       console.error(`[idle:${appId}] ${chunk.trim()}`)
     })
 
-    // Init steamworks with the game's appId, then start idle loop
     proc.stdin!.write(JSON.stringify({ id: 1, type: 'INIT', appId }) + '\n')
     proc.stdin!.write(JSON.stringify({ id: 2, type: 'IDLE' }) + '\n')
 
     proc.on('exit', () => {
       this.idlers.delete(appId)
-      this.names.delete(appId)  // keep names in sync so getIdlingGames() stays consistent
+      this.names.delete(appId)
+      // Notify listeners so the tray can refresh without waiting for the poll.
+      this.emit('changed')
     })
 
     this.idlers.set(appId, proc)
     console.log(`[idle] Started idling appId=${appId}`)
+    this.emit('changed')
   }
 
   stopIdle(appId: number): void {
     const proc = this.idlers.get(appId)
     if (!proc) return
+
+    // 1. Close stdin so the worker's 'end' handler fires and it calls process.exit(0)
     try { proc.stdin!.end() } catch { /* ok */ }
-    try { proc.kill() } catch { /* ok */ }
+
+    // 2. Use tree-kill to SIGKILL the entire process subtree (works on Windows too).
+    //    Fall back to proc.kill() if the pid is unavailable.
+    const pid = proc.pid
+    if (pid !== undefined) {
+      treeKill(pid, 'SIGKILL', (err) => {
+        if (err) {
+          // Tree-kill failed (process may have already exited) — best-effort fallback.
+          try { proc.kill('SIGKILL') } catch { /* ok */ }
+        }
+      })
+    } else {
+      try { proc.kill('SIGKILL') } catch { /* ok */ }
+    }
+
     this.idlers.delete(appId)
     this.names.delete(appId)
     console.log(`[idle] Stopped idling appId=${appId}`)
+    this.emit('changed')
   }
 
   getIdlingAppIds(): number[] {

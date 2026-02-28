@@ -1,7 +1,9 @@
 import * as sw from 'steamworks.js'
-// runCallbacks may be a named export depending on the steamworks.js version
-const { runCallbacks } = sw as any
 import axios from 'axios'
+
+// runCallbacks is typed via src/main/steam/steamworks-types.d.ts (module augmentation).
+// That file is a compile-time-only .d.ts — no runtime import needed or possible.
+const { runCallbacks } = sw
 
 type SteamClient = Omit<sw.Client, 'init' | 'runCallbacks'>
 
@@ -64,7 +66,7 @@ function handleInit(id: number, appId: number, apiKey?: string) {
     currentAppId = appId
     if (apiKey) storedApiKey = apiKey
     try {
-      const steamId = client.localplayer.getSteamId().steamId64.toString()
+      const steamId = client!.localplayer.getSteamId().steamId64.toString()
       console.error(`[worker] Steam OK, SteamID=${steamId}`)
     } catch (e) {
       console.error(`[worker] localplayer check failed:`, e)
