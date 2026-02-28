@@ -217,26 +217,38 @@ export default function Sidebar() {
 
         {/* Achievement progress */}
         {games.length > 0 && (
-          <div className="rounded-xl px-3 py-2.5" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--muted)' }}>
-                <Gamepad2 className="w-3 h-3" /> {games.length}
-              </span>
-              <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--muted)' }}>
-                <Trophy className="w-3 h-3" /> {unlockedAchs}/{totalAchs}
-              </span>
-            </div>
+          <div className="rounded-xl overflow-hidden" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
+            {/* Progress bar top */}
             {totalAchs > 0 && (
-              <>
-                <div className="h-1 rounded-full overflow-hidden" style={{ background: 'var(--border)' }}>
-                  <div className="h-full rounded-full transition-all duration-700"
-                    style={{ width: `${achPct}%`, background: 'linear-gradient(90deg, var(--accent), #7c3aed)' }} />
-                </div>
-                <p className="text-xs mt-1 text-right tabular-nums" style={{ color: 'var(--muted)', fontSize: 10 }}>
-                  {achPct}% complete
-                </p>
-              </>
+              <div className="h-0.5 w-full" style={{ background: 'rgba(255,255,255,0.05)' }}>
+                <div className="h-full transition-all duration-700" style={{ width: `${achPct}%`, background: 'linear-gradient(90deg, var(--accent), #7c3aed)' }} />
+              </div>
             )}
+            <div className="px-2.5 py-2 flex items-center gap-2">
+              {/* Games pill */}
+              <span className="flex items-center gap-1" style={{ color: 'var(--muted)' }}>
+                <Gamepad2 className="w-3 h-3" style={{ color: 'var(--accent)' }} />
+                <span className="text-[11px] font-medium tabular-nums" style={{ color: 'var(--text)' }}>{games.length}</span>
+              </span>
+              <span className="text-[10px]" style={{ color: 'var(--border)' }}>·</span>
+              {/* Achievements pill */}
+              <span className="flex items-center gap-1">
+                <Trophy className="w-3 h-3" style={{ color: '#7c3aed' }} />
+                <span className="text-[11px] font-medium tabular-nums" style={{ color: 'var(--text)' }}>
+                  {unlockedAchs}<span style={{ color: 'var(--muted)' }}>/{totalAchs}</span>
+                </span>
+              </span>
+              {/* Percentage badge */}
+              {totalAchs > 0 && (
+                <span className="ml-auto text-[10px] font-bold tabular-nums px-1.5 py-0.5 rounded-md"
+                  style={{
+                    background: 'rgba(124,58,237,0.12)',
+                    color: achPct >= 80 ? '#a78bfa' : 'var(--muted)',
+                  }}>
+                  {achPct}%
+                </span>
+              )}
+            </div>
           </div>
         )}
 
