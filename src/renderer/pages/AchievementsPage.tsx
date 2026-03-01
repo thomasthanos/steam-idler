@@ -141,7 +141,7 @@ export default function AchievementsPage() {
     const fromCtx = games.find(g => g.appId === numAppId)
     if (fromCtx) { setGameName(fromCtx.name); return }
     window.steam.resolveAppName(numAppId).then(r => {
-      if (r?.success && r?.data) setGameName((r.data as any).name ?? r.data as string)
+      if (r?.success && r?.data) setGameName((r.data as any).name ?? String(r.data))
     }).catch(() => {})
   }, [numAppId, games])
 

@@ -9,22 +9,19 @@ import clsx from 'clsx'
 export default function SettingsPage() {
   const { settings, updateSettings } = useAppContext()
   const [apiKey, setApiKey] = useState(settings.steamApiKey ?? '')
-  const [steamId, setSteamId] = useState(settings.steamId ?? '')
   const [customAppIds, setCustomAppIds] = useState(settings.customAppIds ?? '')
   const [autostart, setAutostart] = useState(false)
 
   useEffect(() => {
     setApiKey(settings.steamApiKey ?? '')
-    setSteamId(settings.steamId ?? '')
     setCustomAppIds(settings.customAppIds ?? '')
-  }, [settings.steamApiKey, settings.steamId, settings.customAppIds])
+  }, [settings.steamApiKey, settings.customAppIds])
 
   // Auto-detect and save Steam ID on mount
   useEffect(() => {
     if (!settings.steamId) {
       window.steam.getUserInfo().then(res => {
         if (res.success && res.data?.steamId) {
-          setSteamId(res.data.steamId)
           updateSettings({ steamId: res.data.steamId }).catch(() => {})
         }
       }).catch(() => {})

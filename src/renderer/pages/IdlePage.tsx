@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react'
-import { Play, Square, Search, Clock, Plus, X } from 'lucide-react'
+import { Play, Square, Search, Clock } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAppContext } from '../hooks/useAppContext'
 import GameImage from '../components/GameImage'
 import toast from 'react-hot-toast'
-import clsx from 'clsx'
 
 export default function IdlePage() {
   const { games, settings } = useAppContext()

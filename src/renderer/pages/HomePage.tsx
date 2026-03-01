@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import {
-  Gamepad2, Trophy, RefreshCw, AlertCircle, Key, Shield,
+  Gamepad2, Trophy, RefreshCw, Key, Shield,
   Tag, ExternalLink, Star, Gift, Clock, BarChart2,
   TrendingUp, Zap, ChevronRight, Wifi, WifiOff,
 } from 'lucide-react'
