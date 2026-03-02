@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.idleManager = void 0;
+exports.steamAccountManager = exports.idleManager = void 0;
 exports.forceQuit = forceQuit;
 const electron_1 = require("electron");
 const trayIcons_1 = require("./trayIcons");
@@ -43,6 +43,7 @@ const handlers_1 = require("./ipc/handlers");
 const updater_1 = require("./updater");
 const client_1 = require("./steam/client");
 const idleManager_1 = require("./steam/idleManager");
+const steamUser_1 = require("./steam/steamUser");
 const store_1 = require("./store");
 // ─── Set app identity FIRST — must be before any new Store() call ─────────────
 electron_1.app.setName('Souvlatzidiko-Unlocker');
@@ -56,6 +57,8 @@ let trayUpdateInterval = null;
 let activateListenerRegistered = false;
 const steamClient = new client_1.SteamClient();
 exports.idleManager = new idleManager_1.IdleManager();
+exports.steamAccountManager = new steamUser_1.SteamAccountManager();
+exports.idleManager.setSteamAccountManager(exports.steamAccountManager);
 const isDev = process.env.NODE_ENV === 'development' || !electron_1.app.isPackaged;
 // ─── Production logging ───────────────────────────────────────────────────────
 if (!isDev) {
@@ -333,7 +336,7 @@ function createTray() {
     }
 }
 // ─── Main window ───────────────────────────────────────────────────────────
-function createWindow() {
+function createWindow(startMinimized = false) {
     mainWindow = new electron_1.BrowserWindow({
         width: 1000,
         height: 820,
@@ -359,7 +362,9 @@ function createWindow() {
         mainWindow.loadFile(path.join(electron_1.app.getAppPath(), 'dist', 'renderer', 'index.html'));
     }
     mainWindow.once('ready-to-show', () => {
-        mainWindow?.show();
+        if (!startMinimized) {
+            mainWindow?.show();
+        }
         // Trigger a silent background update check so the renderer gets
         // the updater status after the window is ready (the startup check
         // runs before the window exists, so broadcast() has no target).
@@ -424,15 +429,16 @@ function setupWindowIpc() {
 }
 // ─── App lifecycle ─────────────────────────────────────────────────────────
 electron_1.app.whenReady().then(async () => {
-    (0, handlers_1.setupIpcHandlers)(steamClient, exports.idleManager);
+    (0, handlers_1.setupIpcHandlers)(steamClient, exports.idleManager, exports.steamAccountManager);
     setupWindowIpc(); // Register window IPC once at startup
     await runSplashFlow(() => {
-        createWindow();
+        const settings = (0, store_1.getStore)().get('settings');
+        const startMinimized = settings.autostart && settings.minimizeToTray;
+        createWindow(startMinimized);
         createTray();
         // setupUpdater MUST be called after the splash flow so that
         // autoUpdater.removeAllListeners() doesn't clobber the splash listeners.
         (0, updater_1.setupUpdater)();
-        const settings = (0, store_1.getStore)().get('settings');
         if (settings.autoIdleGames?.length) {
             for (const game of settings.autoIdleGames) {
                 try {
@@ -442,6 +448,18 @@ electron_1.app.whenReady().then(async () => {
                     console.error(`[auto-idle] Failed to start ${game.appId}:`, e);
                 }
             }
+        }
+        // Auto-reconnect Steam account if a refresh token is stored
+        if (settings.steamRefreshToken) {
+            setTimeout(() => {
+                try {
+                    const token = Buffer.from(settings.steamRefreshToken, 'base64').toString('utf8');
+                    exports.steamAccountManager.loginWithRefreshToken(token).catch(e => {
+                        console.error('[steam-account] Auto-reconnect failed:', e);
+                    });
+                }
+                catch { /* ok */ }
+            }, 2000);
         }
         // Guard against duplicate 'activate' listeners on macOS
         if (!activateListenerRegistered) {
@@ -477,6 +495,7 @@ function forceQuit() {
     tray?.destroy();
     tray = null;
     exports.idleManager.stopAll();
+    exports.steamAccountManager.destroy();
     const timeout = setTimeout(() => electron_1.app.exit(0), 3000);
     steamClient.destroy()
         .catch(() => { })

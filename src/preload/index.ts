@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import { IPC, IPCResponse, AppSettings, Achievement, SteamGame, SteamUser, IdleGame } from '../shared/types'
+import { IPC, IPCResponse, AppSettings, Achievement, SteamGame, SteamUser, SteamAccountStatusInfo, QrLoginEvent } from '../shared/types'
 
 // ─── Exposed API ──────────────────────────────────────────────────────────────
 const steamAPI = {
@@ -108,6 +108,39 @@ const steamAPI = {
     const handler = (_: unknown, p: import('../shared/types').PartnerAppDownloadProgress) => cb(p)
     ipcRenderer.on(IPC.PARTNER_APP_DOWNLOAD_PROGRESS, handler)
     return () => ipcRenderer.removeListener(IPC.PARTNER_APP_DOWNLOAD_PROGRESS, handler)
+  },
+
+  // Steam Account (auto-invisible)
+  steamAccountStatus: (): Promise<IPCResponse<SteamAccountStatusInfo>> =>
+    ipcRenderer.invoke(IPC.STEAM_ACCOUNT_STATUS),
+
+  steamAccountLogout: (): Promise<IPCResponse<void>> =>
+    ipcRenderer.invoke(IPC.STEAM_ACCOUNT_LOGOUT),
+
+  steamAccountSetInvisible: (): Promise<IPCResponse<void>> =>
+    ipcRenderer.invoke(IPC.STEAM_ACCOUNT_SET_INVISIBLE),
+
+  // QR code login
+  steamAccountQrStart: (): Promise<IPCResponse<void>> =>
+    ipcRenderer.invoke(IPC.STEAM_ACCOUNT_QR_START),
+
+  steamAccountQrCancel: (): Promise<IPCResponse<void>> =>
+    ipcRenderer.invoke(IPC.STEAM_ACCOUNT_QR_CANCEL),
+
+  onSteamAccountQrEvent: (cb: (evt: QrLoginEvent) => void) => {
+    const handler = (_: unknown, evt: QrLoginEvent) => cb(evt)
+    ipcRenderer.on(IPC.STEAM_ACCOUNT_QR_EVENT, handler)
+    return () => ipcRenderer.removeListener(IPC.STEAM_ACCOUNT_QR_EVENT, handler)
+  },
+
+  // Cookie / refresh-token login
+  steamAccountTokenLogin: (token: string): Promise<IPCResponse<SteamAccountStatusInfo>> =>
+    ipcRenderer.invoke(IPC.STEAM_ACCOUNT_TOKEN_LOGIN, token),
+
+  onSteamAccountStatusChanged: (cb: (info: SteamAccountStatusInfo) => void) => {
+    const handler = (_: unknown, info: SteamAccountStatusInfo) => cb(info)
+    ipcRenderer.on(IPC.STEAM_ACCOUNT_STATUS_CHANGED, handler)
+    return () => ipcRenderer.removeListener(IPC.STEAM_ACCOUNT_STATUS_CHANGED, handler)
   },
 
   // Theme listener

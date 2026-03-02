@@ -57,6 +57,25 @@ const steamAPI = {
         electron_1.ipcRenderer.on(types_1.IPC.PARTNER_APP_DOWNLOAD_PROGRESS, handler);
         return () => electron_1.ipcRenderer.removeListener(types_1.IPC.PARTNER_APP_DOWNLOAD_PROGRESS, handler);
     },
+    // Steam Account (auto-invisible)
+    steamAccountStatus: () => electron_1.ipcRenderer.invoke(types_1.IPC.STEAM_ACCOUNT_STATUS),
+    steamAccountLogout: () => electron_1.ipcRenderer.invoke(types_1.IPC.STEAM_ACCOUNT_LOGOUT),
+    steamAccountSetInvisible: () => electron_1.ipcRenderer.invoke(types_1.IPC.STEAM_ACCOUNT_SET_INVISIBLE),
+    // QR code login
+    steamAccountQrStart: () => electron_1.ipcRenderer.invoke(types_1.IPC.STEAM_ACCOUNT_QR_START),
+    steamAccountQrCancel: () => electron_1.ipcRenderer.invoke(types_1.IPC.STEAM_ACCOUNT_QR_CANCEL),
+    onSteamAccountQrEvent: (cb) => {
+        const handler = (_, evt) => cb(evt);
+        electron_1.ipcRenderer.on(types_1.IPC.STEAM_ACCOUNT_QR_EVENT, handler);
+        return () => electron_1.ipcRenderer.removeListener(types_1.IPC.STEAM_ACCOUNT_QR_EVENT, handler);
+    },
+    // Cookie / refresh-token login
+    steamAccountTokenLogin: (token) => electron_1.ipcRenderer.invoke(types_1.IPC.STEAM_ACCOUNT_TOKEN_LOGIN, token),
+    onSteamAccountStatusChanged: (cb) => {
+        const handler = (_, info) => cb(info);
+        electron_1.ipcRenderer.on(types_1.IPC.STEAM_ACCOUNT_STATUS_CHANGED, handler);
+        return () => electron_1.ipcRenderer.removeListener(types_1.IPC.STEAM_ACCOUNT_STATUS_CHANGED, handler);
+    },
     // Theme listener
     onThemeChange: (cb) => {
         const handler = (_event, theme) => cb(theme);

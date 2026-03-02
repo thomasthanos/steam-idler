@@ -6,6 +6,7 @@ import { setupIpcHandlers } from './ipc/handlers'
 import { performStartupUpdateCheck, setupUpdater, triggerBackgroundCheck, SplashEvent, PreloadFn } from './updater'
 import { SteamClient } from './steam/client'
 import { IdleManager } from './steam/idleManager'
+import { SteamAccountManager } from './steam/steamUser'
 import { getStore } from './store'
 
 // ─── Set app identity FIRST — must be before any new Store() call ─────────────
@@ -21,6 +22,8 @@ let trayUpdateInterval: ReturnType<typeof setInterval> | null = null
 let activateListenerRegistered = false
 const steamClient = new SteamClient()
 export const idleManager = new IdleManager()
+export const steamAccountManager = new SteamAccountManager()
+idleManager.setSteamAccountManager(steamAccountManager)
 
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged
 
@@ -308,7 +311,7 @@ function createTray(): void {
 }
 
 // ─── Main window ───────────────────────────────────────────────────────────
-function createWindow(): void {
+function createWindow(startMinimized = false): void {
   mainWindow = new BrowserWindow({
     width: 1000,
     height: 820,
@@ -335,7 +338,9 @@ function createWindow(): void {
   }
 
   mainWindow.once('ready-to-show', () => {
-    mainWindow?.show()
+    if (!startMinimized) {
+      mainWindow?.show()
+    }
     // Trigger a silent background update check so the renderer gets
     // the updater status after the window is ready (the startup check
     // runs before the window exists, so broadcast() has no target).
@@ -399,17 +404,18 @@ function setupWindowIpc(): void {
 
 // ─── App lifecycle ─────────────────────────────────────────────────────────
 app.whenReady().then(async () => {
-  setupIpcHandlers(steamClient, idleManager)
+  setupIpcHandlers(steamClient, idleManager, steamAccountManager)
   setupWindowIpc()  // Register window IPC once at startup
 
   await runSplashFlow(() => {
-    createWindow()
+    const settings = getStore().get('settings')
+    const startMinimized = settings.autostart && settings.minimizeToTray
+    createWindow(startMinimized)
     createTray()
     // setupUpdater MUST be called after the splash flow so that
     // autoUpdater.removeAllListeners() doesn't clobber the splash listeners.
     setupUpdater()
 
-    const settings = getStore().get('settings')
     if (settings.autoIdleGames?.length) {
       for (const game of settings.autoIdleGames) {
         try {
@@ -418,6 +424,18 @@ app.whenReady().then(async () => {
           console.error(`[auto-idle] Failed to start ${game.appId}:`, e)
         }
       }
+    }
+
+    // Auto-reconnect Steam account if a refresh token is stored
+    if (settings.steamRefreshToken) {
+      setTimeout(() => {
+        try {
+          const token = Buffer.from(settings.steamRefreshToken!, 'base64').toString('utf8')
+          steamAccountManager.loginWithRefreshToken(token).catch(e => {
+            console.error('[steam-account] Auto-reconnect failed:', e)
+          })
+        } catch { /* ok */ }
+      }, 2000)
     }
 
     // Guard against duplicate 'activate' listeners on macOS
@@ -450,6 +468,7 @@ export function forceQuit() {
   tray?.destroy()
   tray = null
   idleManager.stopAll()
+  steamAccountManager.destroy()
   const timeout = setTimeout(() => app.exit(0), 3000)
   steamClient.destroy()
     .catch(() => {})

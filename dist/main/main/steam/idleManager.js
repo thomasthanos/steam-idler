@@ -53,21 +53,28 @@ const child_process_1 = require("child_process");
 const path = __importStar(require("path"));
 const events_1 = require("events");
 const tree_kill_1 = __importDefault(require("tree-kill"));
+const store_1 = require("../store");
 class IdleManager extends events_1.EventEmitter {
     constructor() {
         super(...arguments);
         this.idlers = new Map();
         this.names = new Map();
+        this.steamAccountManager = null;
+        this.statusChangeAttempted = false;
     }
     get workerPath() {
         return path.join(__dirname, 'worker.js')
             .replace('app.asar' + path.sep, 'app.asar.unpacked' + path.sep);
+    }
+    setSteamAccountManager(manager) {
+        this.steamAccountManager = manager;
     }
     startIdle(appId, name) {
         if (this.idlers.has(appId))
             return;
         if (name)
             this.names.set(appId, name);
+        const wasEmpty = this.idlers.size === 0;
         const proc = (0, child_process_1.spawn)(process.execPath, [this.workerPath], {
             env: {
                 ...process.env,
@@ -95,6 +102,10 @@ class IdleManager extends events_1.EventEmitter {
         this.idlers.set(appId, proc);
         console.log(`[idle] Started idling appId=${appId}`);
         this.emit('changed');
+        // ── Auto-invisible: trigger on first game ────────────────────────────
+        if (wasEmpty && !this.statusChangeAttempted) {
+            this._trySetInvisible(appId);
+        }
     }
     stopIdle(appId) {
         const proc = this.idlers.get(appId);
@@ -129,6 +140,10 @@ class IdleManager extends events_1.EventEmitter {
         this.names.delete(appId);
         console.log(`[idle] Stopped idling appId=${appId}`);
         this.emit('changed');
+        // ── Auto-invisible: restore on last game ─────────────────────────────
+        if (this.idlers.size === 0 && this.statusChangeAttempted) {
+            this._tryRestoreStatus();
+        }
     }
     getIdlingAppIds() {
         return [...this.idlers.keys()];
@@ -147,6 +162,46 @@ class IdleManager extends events_1.EventEmitter {
             this.stopIdle(appId);
         }
         this.names.clear();
+    }
+    // ─── Private helpers ─────────────────────────────────────────────────────
+    _trySetInvisible(appId) {
+        const mgr = this.steamAccountManager;
+        if (!mgr?.isConnected)
+            return;
+        try {
+            const settings = (0, store_1.getStore)().get('settings');
+            if (!settings.autoInvisibleWhenIdling)
+                return;
+        }
+        catch {
+            return;
+        }
+        try {
+            mgr.setInvisible();
+            mgr.setPlayingGame(appId);
+            this.statusChangeAttempted = true;
+            console.log('[idle] Auto-invisible activated');
+        }
+        catch (e) {
+            console.error('[idle] Failed to set invisible:', e);
+        }
+    }
+    _tryRestoreStatus() {
+        const mgr = this.steamAccountManager;
+        if (!mgr?.isConnected) {
+            this.statusChangeAttempted = false;
+            return;
+        }
+        try {
+            mgr.restoreStatus();
+            mgr.clearPlayingGame();
+            this.statusChangeAttempted = false;
+            console.log('[idle] Auto-invisible restored');
+        }
+        catch (e) {
+            console.error('[idle] Failed to restore status:', e);
+            this.statusChangeAttempted = false;
+        }
     }
 }
 exports.IdleManager = IdleManager;

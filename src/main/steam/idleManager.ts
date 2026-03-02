@@ -15,19 +15,29 @@ import { ChildProcess, spawn } from 'child_process'
 import * as path from 'path'
 import { EventEmitter } from 'events'
 import treeKill from 'tree-kill'
+import { SteamAccountManager } from './steamUser'
+import { getStore } from '../store'
 
 export class IdleManager extends EventEmitter {
   private idlers = new Map<number, ChildProcess>()
   private names  = new Map<number, string>()
+  private steamAccountManager: SteamAccountManager | null = null
+  private statusChangeAttempted = false
 
   private get workerPath(): string {
     return path.join(__dirname, 'worker.js')
       .replace('app.asar' + path.sep, 'app.asar.unpacked' + path.sep)
   }
 
+  setSteamAccountManager(manager: SteamAccountManager): void {
+    this.steamAccountManager = manager
+  }
+
   startIdle(appId: number, name?: string): void {
     if (this.idlers.has(appId)) return
     if (name) this.names.set(appId, name)
+
+    const wasEmpty = this.idlers.size === 0
 
     const proc = spawn(process.execPath, [this.workerPath], {
       env: {
@@ -60,6 +70,11 @@ export class IdleManager extends EventEmitter {
     this.idlers.set(appId, proc)
     console.log(`[idle] Started idling appId=${appId}`)
     this.emit('changed')
+
+    // ── Auto-invisible: trigger on first game ────────────────────────────
+    if (wasEmpty && !this.statusChangeAttempted) {
+      this._trySetInvisible(appId)
+    }
   }
 
   stopIdle(appId: number): void {
@@ -87,6 +102,11 @@ export class IdleManager extends EventEmitter {
     this.names.delete(appId)
     console.log(`[idle] Stopped idling appId=${appId}`)
     this.emit('changed')
+
+    // ── Auto-invisible: restore on last game ─────────────────────────────
+    if (this.idlers.size === 0 && this.statusChangeAttempted) {
+      this._tryRestoreStatus()
+    }
   }
 
   getIdlingAppIds(): number[] {
@@ -109,5 +129,43 @@ export class IdleManager extends EventEmitter {
       this.stopIdle(appId)
     }
     this.names.clear()
+  }
+
+  // ─── Private helpers ─────────────────────────────────────────────────────
+  private _trySetInvisible(appId: number): void {
+    const mgr = this.steamAccountManager
+    if (!mgr?.isConnected) return
+
+    try {
+      const settings = getStore().get('settings')
+      if (!settings.autoInvisibleWhenIdling) return
+    } catch { return }
+
+    try {
+      mgr.setInvisible()
+      mgr.setPlayingGame(appId)
+      this.statusChangeAttempted = true
+      console.log('[idle] Auto-invisible activated')
+    } catch (e) {
+      console.error('[idle] Failed to set invisible:', e)
+    }
+  }
+
+  private _tryRestoreStatus(): void {
+    const mgr = this.steamAccountManager
+    if (!mgr?.isConnected) {
+      this.statusChangeAttempted = false
+      return
+    }
+
+    try {
+      mgr.restoreStatus()
+      mgr.clearPlayingGame()
+      this.statusChangeAttempted = false
+      console.log('[idle] Auto-invisible restored')
+    } catch (e) {
+      console.error('[idle] Failed to restore status:', e)
+      this.statusChangeAttempted = false
+    }
   }
 }

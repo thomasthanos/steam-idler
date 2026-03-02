@@ -2,9 +2,10 @@ import { app, ipcMain, Notification, BrowserWindow, shell } from 'electron'
 import * as path from 'path'
 import * as fs from 'fs'
 import axios from 'axios'
-import { IPC, IPCResponse, AppSettings, IdleGame, FeaturedGame, PartnerAppRelease, PartnerAppDownloadProgress } from '../../shared/types'
+import { IPC, IPCResponse, AppSettings, IdleGame, FeaturedGame, PartnerAppRelease, PartnerAppDownloadProgress, SteamAccountStatusInfo, QrLoginEvent } from '../../shared/types'
 import { SteamClient } from '../steam/client'
 import { IdleManager } from '../steam/idleManager'
+import { SteamAccountManager } from '../steam/steamUser'
 import { getStore } from '../store'
 
 function wrap<T>(fn: () => Promise<T>): Promise<IPCResponse<T>> {
@@ -13,7 +14,7 @@ function wrap<T>(fn: () => Promise<T>): Promise<IPCResponse<T>> {
     .catch((error: Error) => ({ success: false, error: error.message }))
 }
 
-export function setupIpcHandlers(steam: SteamClient, idle: IdleManager): void {
+export function setupIpcHandlers(steam: SteamClient, idle: IdleManager, steamAccount: SteamAccountManager): void {
   // ── Steam status ─────────────────────────────────────────────────────────
   ipcMain.handle(IPC.CHECK_STEAM_RUNNING, () =>
     wrap(() => steam.isSteamRunning())
@@ -243,6 +244,91 @@ export function setupIpcHandlers(steam: SteamClient, idle: IdleManager): void {
     } catch (e: any) {
       return { success: true, data: { name: `App ${appId}` } }
     }
+  })
+
+  // ── Steam Account (auto-invisible) ────────────────────────────────────────
+  const pushAccountStatus = (info: SteamAccountStatusInfo) => {
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) win.webContents.send(IPC.STEAM_ACCOUNT_STATUS_CHANGED, info)
+    }
+  }
+  const pushQrEvent = (evt: QrLoginEvent) => {
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) win.webContents.send(IPC.STEAM_ACCOUNT_QR_EVENT, evt)
+    }
+  }
+
+  steamAccount.on('status-changed', pushAccountStatus)
+
+  // When QR login completes, save the refresh token so we can auto-reconnect next launch
+  steamAccount.on('qr-login-complete', (refreshToken: string) => {
+    try {
+      const store = getStore()
+      const current = store.get('settings')
+      store.set('settings', { ...current, steamRefreshToken: Buffer.from(refreshToken).toString('base64') })
+    } catch { /* ok */ }
+  })
+
+  // ── QR code login ─────────────────────────────────────────────────────────
+  ipcMain.handle(IPC.STEAM_ACCOUNT_QR_START, async () => {
+    try {
+      // fire-and-forget: startQrLogin resolves after QR image is ready,
+      // subsequent events are pushed via pushQrEvent
+      steamAccount.startQrLogin(pushQrEvent).catch((e: Error) => {
+        pushQrEvent({ type: 'error', message: e.message })
+      })
+      return { success: true }
+    } catch (e: any) {
+      return { success: false, error: e.message }
+    }
+  })
+
+  ipcMain.handle(IPC.STEAM_ACCOUNT_QR_CANCEL, () => {
+    try { steamAccount.cancelQrLogin(); return { success: true } }
+    catch (e: any) { return { success: false, error: e.message } }
+  })
+
+  // ── Cookie / refresh-token login ──────────────────────────────────────────
+  // `token` is the raw steamLoginSecure cookie value (may contain steamId64||<jwt> or just <jwt>)
+  ipcMain.handle(IPC.STEAM_ACCOUNT_TOKEN_LOGIN, async (_e, token: string) => {
+    try {
+      // Parse steamLoginSecure format: "76561198XXXXXXXXX||<jwt>" (may be URL-encoded)
+      const decoded = decodeURIComponent(token.trim())
+      const refreshToken = decoded.includes('||') ? decoded.split('||')[1] : decoded
+
+      await steamAccount.loginWithRefreshToken(refreshToken)
+
+      // Persist token for auto-reconnect
+      const store = getStore()
+      const current = store.get('settings')
+      store.set('settings', { ...current, steamRefreshToken: Buffer.from(refreshToken).toString('base64') })
+
+      return { success: true, data: steamAccount.getStatusInfo() }
+    } catch (e: any) {
+      return { success: false, error: e.message }
+    }
+  })
+
+  ipcMain.handle(IPC.STEAM_ACCOUNT_LOGOUT, () => {
+    try {
+      steamAccount.logout()
+      const store = getStore()
+      const current = store.get('settings')
+      store.set('settings', { ...current, steamRefreshToken: undefined })
+      return { success: true }
+    } catch (e: any) {
+      return { success: false, error: e.message }
+    }
+  })
+
+  ipcMain.handle(IPC.STEAM_ACCOUNT_STATUS, () => {
+    try { return { success: true, data: steamAccount.getStatusInfo() } }
+    catch (e: any) { return { success: false, error: e.message } }
+  })
+
+  ipcMain.handle(IPC.STEAM_ACCOUNT_SET_INVISIBLE, () => {
+    try { steamAccount.setInvisible(); return { success: true } }
+    catch (e: any) { return { success: false, error: e.message } }
   })
 
   // ── Autostart ─────────────────────────────────────────────────────────────

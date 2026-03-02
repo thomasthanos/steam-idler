@@ -1,8 +1,8 @@
 import { useNavigate } from 'react-router-dom'
 import {
-  Gamepad2, Trophy, RefreshCw, Key, Shield,
+  Trophy, Key,
   Tag, ExternalLink, Star, Gift, Clock, BarChart2,
-  TrendingUp, Zap, ChevronRight, Wifi, WifiOff,
+  TrendingUp, ChevronRight,
 } from 'lucide-react'
 import { useAppContext } from '../hooks/useAppContext'
 import { motion } from 'framer-motion'
@@ -106,7 +106,7 @@ function formatPlaytime(minutes: number): string {
 
 // ─── Main ──────────────────────────────────────────────────────────────────
 export default function HomePage() {
-  const { user, steamRunning, isLoadingUser, refreshUser, settings, games } = useAppContext()
+  const { steamRunning, settings, games } = useAppContext()
   const navigate = useNavigate()
   const [deals, setDeals]         = useState<FeaturedGame[]>([])
   const [featured, setFeatured]   = useState<FeaturedGame[]>([])
@@ -135,98 +135,6 @@ export default function HomePage() {
     <div className="h-full overflow-y-auto" style={{ background: 'var(--bg)' }}>
       <div className="max-w-3xl mx-auto px-6 py-6 space-y-6">
 
-        {/* ── Hero: Steam Connection ── */}
-        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-          <div className="relative rounded-2xl overflow-hidden p-5"
-            style={{ background: 'var(--card)', border: '1px solid var(--border)' }}
-          >
-            {/* Decorative gradient bg */}
-            <div className="absolute inset-0 pointer-events-none"
-              style={{ background: steamRunning ? 'radial-gradient(ellipse at top right, rgba(59,130,246,0.07) 0%, transparent 60%)' : 'radial-gradient(ellipse at top right, rgba(239,68,68,0.05) 0%, transparent 60%)' }}
-            />
-
-            <div className="relative flex items-center justify-between gap-4">
-              {isLoadingUser ? (
-                <div className="flex items-center gap-4 flex-1">
-                  <div className="w-14 h-14 rounded-full skeleton shrink-0" />
-                  <div className="space-y-2 flex-1">
-                    <div className="h-4 w-32 skeleton rounded" />
-                    <div className="h-3 w-20 skeleton rounded" />
-                    <div className="h-3 w-16 skeleton rounded" />
-                  </div>
-                </div>
-              ) : steamRunning && user ? (
-                <div className="flex items-center gap-4 flex-1">
-                  <div className="relative shrink-0">
-                    <img src={user.avatarUrl} alt="" className="w-14 h-14 rounded-full object-cover"
-                      style={{ outline: '2px solid rgba(59,130,246,0.5)', outlineOffset: 2 }} />
-                    <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full flex items-center justify-center"
-                      style={{ background: 'var(--green)', border: '2.5px solid var(--card)' }} />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="font-bold text-base truncate" style={{ color: 'var(--text)' }}>{user.personaName}</p>
-                    <p className="text-xs font-mono mt-0.5 truncate" style={{ color: 'var(--muted)' }}>{user.steamId}</p>
-                    <div className="flex items-center gap-1.5 mt-1">
-                      <Wifi className="w-3 h-3" style={{ color: 'var(--green)' }} />
-                      <span className="text-xs font-medium" style={{ color: 'var(--green)' }}>Connected</span>
-                      {user.level > 0 && (
-                        <span className="text-xs px-1.5 py-0.5 rounded-md" style={{ background: 'rgba(59,130,246,0.12)', color: 'var(--accent)' }}>
-                          Lv {user.level}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-center gap-4 flex-1">
-                  <div className="w-14 h-14 rounded-full flex items-center justify-center shrink-0"
-                    style={{ background: 'rgba(239,68,68,0.08)', border: '2px solid rgba(239,68,68,0.2)' }}>
-                    <WifiOff className="w-6 h-6" style={{ color: 'var(--red)' }} />
-                  </div>
-                  <div>
-                    <p className="font-semibold" style={{ color: 'var(--text)' }}>Steam Offline</p>
-                    <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>Launch Steam to continue</p>
-                  </div>
-                </div>
-              )}
-
-              <button onClick={refreshUser} disabled={isLoadingUser}
-                className="btn-ghost text-xs shrink-0 self-start"
-                title="Refresh (Ctrl+R)">
-                <RefreshCw className={`w-3.5 h-3.5 ${isLoadingUser ? 'animate-spin' : ''}`} />
-                Refresh
-              </button>
-            </div>
-
-            {/* Quick Actions row — only when connected */}
-            {steamRunning && (
-              <div className="relative grid grid-cols-3 gap-2 mt-4 pt-4" style={{ borderTop: '1px solid var(--border)' }}>
-                {[
-                  { icon: Gamepad2, label: 'Library',      desc: 'Browse all games', to: '/games',     color: 'var(--accent)', iconBg: 'rgba(59,130,246,0.1)'  },
-                  { icon: Trophy,   label: 'Achievements',  desc: 'Pick a game',      to: '/games',     color: '#f59e0b',       iconBg: 'rgba(245,158,11,0.1)' },
-                  { icon: Zap,      label: 'Auto-Idle',     desc: 'Manage idling',    to: '/auto-idle', color: '#22c55e',       iconBg: 'rgba(34,197,94,0.1)'  },
-                ].map(({ icon: Icon, label, desc, to, color, iconBg }) => (
-                  <button key={to + label} onClick={() => navigate(to)}
-                    className="group flex items-center gap-2.5 px-3 py-2.5 rounded-xl transition-all duration-200 text-left"
-                    style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
-                    onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--borderhov)'; e.currentTarget.style.background = 'var(--panel)' }}
-                    onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)';    e.currentTarget.style.background = 'var(--surface)' }}
-                  >
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-transform group-hover:scale-110"
-                      style={{ background: iconBg }}>
-                      <Icon className="w-4 h-4" style={{ color }} />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-xs font-semibold" style={{ color: 'var(--text)' }}>{label}</p>
-                      <p className="text-xs truncate" style={{ color: 'var(--muted)' }}>{desc}</p>
-                    </div>
-                    <ChevronRight className="w-3.5 h-3.5 ml-auto shrink-0 opacity-0 group-hover:opacity-50 transition-opacity" style={{ color: 'var(--sub)' }} />
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </motion.div>
 
         {/* API key hint */}
         {steamRunning && !settings.steamApiKey && (
@@ -400,17 +308,6 @@ export default function HomePage() {
           </motion.div>
         )}
 
-        {/* ── Disclaimer ── */}
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.25 }}
-          className="flex items-start gap-3 px-4 py-3 rounded-xl"
-          style={{ background: 'rgba(234,179,8,0.05)', border: '1px solid rgba(234,179,8,0.12)' }}
-        >
-          <Shield className="w-4 h-4 mt-0.5 shrink-0" style={{ color: 'rgba(234,179,8,0.6)' }} />
-          <p className="text-xs leading-relaxed" style={{ color: 'rgba(234,179,8,0.55)' }}>
-            <strong style={{ color: 'rgba(234,179,8,0.75)' }}>Use responsibly.</strong>{' '}
-            Modifying achievements may violate the Steam Subscriber Agreement. For personal / educational use only.
-          </p>
-        </motion.div>
 
       </div>
     </div>

@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import { Home, Gamepad2, Settings, Wifi, WifiOff, Trophy, ChevronRight, Sparkles } from 'lucide-react'
+import { Home, Gamepad2, Settings, User, ChevronRight, Sparkles } from 'lucide-react'
 import { useAppContext } from '../hooks/useAppContext'
 import GameImage from './GameImage'
 import clsx from 'clsx'
@@ -34,15 +34,14 @@ function AutoIdleIcon({ size = 16, color = 'currentColor' }: { size?: number; co
 // ── Nav data ────────────────────────────────────────────────────────────────
 
 const navItems = [
-  { to: '/home',     icon: Home,     label: 'Home',     desc: 'Deals & promos' },
-  { to: '/games',    icon: Gamepad2, label: 'Library',  desc: 'All games' },
-  { to: '/settings', icon: Settings, label: 'Settings', desc: 'Configure' },
+  { to: '/home',  icon: Home,     label: 'Home'    },
+  { to: '/games', icon: Gamepad2, label: 'Library' },
 ]
 
 // ── Component ───────────────────────────────────────────────────────────────
 
 export default function Sidebar() {
-  const { steamRunning, games } = useAppContext()
+  const { steamRunning, user, games } = useAppContext()
   const navigate = useNavigate()
   const [idlingCount, setIdlingCount] = useState(0)
 
@@ -62,9 +61,6 @@ export default function Sidebar() {
     .sort((a, b) => (b.lastPlayed ?? 0) - (a.lastPlayed ?? 0))
     .slice(0, 5)
 
-  const totalAchs    = games.reduce((s, g) => s + g.achievementCount, 0)
-  const unlockedAchs = games.reduce((s, g) => s + g.achievementsUnlocked, 0)
-  const achPct       = totalAchs > 0 ? Math.round((unlockedAchs / totalAchs) * 100) : 0
 
   // ── Nav link ──────────────────────────────────────────────────────────────
   function NavItem({ to, icon: Icon, svgIcon, label, badge }: {
@@ -186,22 +182,16 @@ export default function Sidebar() {
         </div>
       )}
 
-      {/* ── Footer stats ── */}
+      {/* ── Footer ── */}
       <div className="mt-auto p-2.5 space-y-1.5">
 
-        {/* Portfolio adv */}
+        {/* More Apps */}
         <NavLink
           to="/portfolio"
           className="group block rounded-xl overflow-hidden transition-all duration-200"
           style={{ border: '1px solid rgba(167,139,250,0.2)', background: 'rgba(167,139,250,0.05)' }}
-          onMouseEnter={e => {
-            e.currentTarget.style.borderColor = 'rgba(167,139,250,0.4)'
-            e.currentTarget.style.background = 'rgba(167,139,250,0.1)'
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.borderColor = 'rgba(167,139,250,0.2)'
-            e.currentTarget.style.background = 'rgba(167,139,250,0.05)'
-          }}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(167,139,250,0.4)'; e.currentTarget.style.background = 'rgba(167,139,250,0.1)' }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(167,139,250,0.2)'; e.currentTarget.style.background = 'rgba(167,139,250,0.05)' }}
         >
           <div className="px-3 py-2.5 flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'rgba(167,139,250,0.15)' }}>
@@ -215,60 +205,51 @@ export default function Sidebar() {
           </div>
         </NavLink>
 
-        {/* Achievement progress */}
-        {games.length > 0 && (
-          <div className="rounded-xl overflow-hidden" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
-            {/* Progress bar top */}
-            {totalAchs > 0 && (
-              <div className="h-0.5 w-full" style={{ background: 'rgba(255,255,255,0.05)' }}>
-                <div className="h-full transition-all duration-700" style={{ width: `${achPct}%`, background: 'linear-gradient(90deg, var(--accent), #7c3aed)' }} />
+        {/* Profile + Settings icon */}
+        <div className="flex items-center gap-2 px-2.5 py-2 rounded-xl" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
+
+          {/* Avatar with steam status dot */}
+          <div className="relative shrink-0">
+            {user?.avatarUrl ? (
+              <img src={user.avatarUrl} className="w-7 h-7 rounded-full object-cover" alt="" />
+            ) : (
+              <div className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: 'var(--surface)' }}>
+                <User className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
               </div>
             )}
-            <div className="px-2.5 py-2 flex items-center gap-2">
-              {/* Games pill */}
-              <span className="flex items-center gap-1" style={{ color: 'var(--muted)' }}>
-                <Gamepad2 className="w-3 h-3" style={{ color: 'var(--accent)' }} />
-                <span className="text-[11px] font-medium tabular-nums" style={{ color: 'var(--text)' }}>{games.length}</span>
-              </span>
-              <span className="text-[10px]" style={{ color: 'var(--border)' }}>·</span>
-              {/* Achievements pill */}
-              <span className="flex items-center gap-1">
-                <Trophy className="w-3 h-3" style={{ color: '#7c3aed' }} />
-                <span className="text-[11px] font-medium tabular-nums" style={{ color: 'var(--text)' }}>
-                  {unlockedAchs}<span style={{ color: 'var(--muted)' }}>/{totalAchs}</span>
-                </span>
-              </span>
-              {/* Percentage badge */}
-              {totalAchs > 0 && (
-                <span className="ml-auto text-[10px] font-bold tabular-nums px-1.5 py-0.5 rounded-md"
-                  style={{
-                    background: 'rgba(124,58,237,0.12)',
-                    color: achPct >= 80 ? '#a78bfa' : 'var(--muted)',
-                  }}>
-                  {achPct}%
-                </span>
-              )}
-            </div>
+            <span
+              className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2"
+              style={{
+                background: steamRunning ? 'var(--green)' : 'var(--muted)',
+                borderColor: 'var(--card)',
+                boxShadow: steamRunning ? '0 0 5px var(--green)' : 'none',
+              }}
+            />
           </div>
-        )}
 
-        {/* Steam status */}
-        <div
-          className="flex items-center gap-2 text-xs rounded-xl px-3 py-2 transition-all duration-300"
-          style={{
-            background: steamRunning ? 'rgba(34,197,94,0.07)' : 'rgba(239,68,68,0.07)',
-            color: steamRunning ? 'var(--green)' : 'var(--red)',
-            border: `1px solid ${steamRunning ? 'rgba(34,197,94,0.18)' : 'rgba(239,68,68,0.18)'}`,
-          }}
-        >
-          {steamRunning
-            ? <><Wifi className="w-3 h-3 shrink-0" /><span>Steam connected</span></>
-            : <><WifiOff className="w-3 h-3 shrink-0" /><span>Steam offline</span></>
-          }
-          {steamRunning && (
-            <span className="ml-auto w-1.5 h-1.5 rounded-full shrink-0"
-              style={{ background: 'var(--green)', boxShadow: '0 0 6px var(--green)' }} />
-          )}
+          {/* Name + SteamID */}
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-semibold truncate" style={{ color: 'var(--text)' }}>
+              {user?.personaName ?? (steamRunning ? 'Loading…' : 'Steam offline')}
+            </p>
+            {user?.steamId && (
+              <p className="text-[10px] font-mono truncate" style={{ color: 'var(--muted)' }}>{user.steamId}</p>
+            )}
+          </div>
+
+          {/* Settings — icon only */}
+          <NavLink
+            to="/settings"
+            className={({ isActive }) => clsx(
+              'shrink-0 p-1.5 rounded-lg transition-colors',
+              isActive
+                ? 'text-[var(--accent)] bg-[rgba(59,130,246,0.12)]'
+                : 'text-[var(--muted)] hover:text-[var(--sub)] hover:bg-[var(--hover-overlay)]',
+            )}
+            title="Settings"
+          >
+            <Settings className="w-3.5 h-3.5" />
+          </NavLink>
         </div>
       </div>
     </aside>

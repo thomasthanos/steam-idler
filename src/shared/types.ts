@@ -115,6 +115,18 @@ export const IPC = {
   GET_PARTNER_APP_RELEASES:      'partner:get-releases',
   DOWNLOAD_PARTNER_APP:          'partner:download',
   PARTNER_APP_DOWNLOAD_PROGRESS: 'partner:download-progress', // push main → renderer
+
+  // Steam Account (auto-invisible)
+  STEAM_ACCOUNT_LOGOUT:         'steam-account:logout',
+  STEAM_ACCOUNT_STATUS:         'steam-account:status',
+  STEAM_ACCOUNT_SET_INVISIBLE:  'steam-account:set-invisible',
+  STEAM_ACCOUNT_STATUS_CHANGED: 'steam-account:status-changed', // push main → renderer
+  // QR code login
+  STEAM_ACCOUNT_QR_START:       'steam-account:qr-start',
+  STEAM_ACCOUNT_QR_CANCEL:      'steam-account:qr-cancel',
+  STEAM_ACCOUNT_QR_EVENT:       'steam-account:qr-event',       // push main → renderer
+  // Cookie / refresh-token login
+  STEAM_ACCOUNT_TOKEN_LOGIN:    'steam-account:token-login',
 } as const
 
 // ─── Updater ─────────────────────────────────────────────────────────────────────
@@ -148,7 +160,26 @@ export interface AppSettings {
   autoIdleGames: IdleGame[]
   notificationsEnabled: boolean
   notificationSound: boolean
+  // Steam Account (auto-invisible when idling)
+  steamRefreshToken?: string  // base64-obfuscated refresh token
+  autoInvisibleWhenIdling: boolean
 }
+
+// ─── Steam Account Status ─────────────────────────────────────────────────────
+export type SteamAccountConnectionStatus = 'disconnected' | 'connecting' | 'connected'
+
+export interface SteamAccountStatusInfo {
+  status: SteamAccountConnectionStatus
+  username: string | null
+}
+
+// ─── QR Login Events (pushed main → renderer) ────────────────────────────────
+export type QrLoginEvent =
+  | { type: 'qr-code';  dataUrl: string }
+  | { type: 'scanned' }
+  | { type: 'success' }
+  | { type: 'timeout' }
+  | { type: 'error';    message: string }
 
 // ─── Partner Apps ────────────────────────────────────────────────────────────
 export interface PartnerAppRelease {
@@ -177,4 +208,5 @@ export const DEFAULT_SETTINGS: AppSettings = {
   autoIdleGames: [],
   notificationsEnabled: true,
   notificationSound: true,
+  autoInvisibleWhenIdling: true,
 }
