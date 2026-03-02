@@ -4,20 +4,57 @@
  *   1. QR code  – user scans with Steam mobile app (via steam-session)
  *   2. Cookie   – user pastes steamLoginSecure cookie value (refresh token)
  *
- * Once connected, can set persona state to Invisible while idling and restore it afterwards.
- * Completely optional: if no credentials are configured the idle manager works without touching status.
+ * Persona state (invisible/restore) is changed via the steam:// URL protocol,
+ * which routes through the running Steam client itself — zero network traffic,
+ * no CM session conflict, 100% reliable.
  */
 
 import { EventEmitter } from 'events'
+import { shell } from 'electron'
+import * as fs from 'fs'
+import * as path from 'path'
 import SteamUser from 'steam-user'
 import { LoginSession, EAuthTokenPlatformType } from 'steam-session'
 import * as QRCode from 'qrcode'
 import { SteamAccountConnectionStatus, SteamAccountStatusInfo, QrLoginEvent } from '../../shared/types'
+import { getSteamPath, parseTextVdf, VdfObject } from './steamPaths'
+
+// EPersonaState values used in localconfig.vdf
+const PERSONA_STATE_NAMES: Record<number, string> = {
+  0: 'offline',
+  1: 'online',
+  2: 'busy',
+  3: 'away',
+  4: 'snooze',
+  7: 'invisible',
+}
+
+/** Read PersonaStateDesired from userdata/<accountId>/config/localconfig.vdf */
+function readPersonaStateDesired(accountId: number): number {
+  try {
+    const vdfPath = path.join(getSteamPath(), 'userdata', String(accountId), 'config', 'localconfig.vdf')
+    if (!fs.existsSync(vdfPath)) return 1
+    const text = fs.readFileSync(vdfPath, 'utf8')
+    const data = parseTextVdf(text)
+    const store = (data['UserLocalConfigStore'] ?? data['userLocalConfigStore'] ?? {}) as VdfObject
+    const friends = (store['friends'] ?? store['Friends'] ?? {}) as VdfObject
+    const val = parseInt(String(friends['PersonaStateDesired'] ?? '1'))
+    return isNaN(val) ? 1 : val
+  } catch {
+    return 1 // default: Online
+  }
+}
+
+/** Change Steam persona state via the steam:// URL protocol (no CM traffic). */
+async function setPersonaViaProtocol(state: 'online' | 'away' | 'invisible' | 'offline' | 'busy' | 'snooze'): Promise<void> {
+  await shell.openExternal(`steam://friends/status/${state}`)
+}
 
 export class SteamAccountManager extends EventEmitter {
   private client: SteamUser | null = null
   private qrSession: LoginSession | null = null
-  private originalPersonaState: SteamUser.EPersonaState = SteamUser.EPersonaState.Online
+  private _originalPersonaStateName: string = 'online'
+  private _accountId: number | null = null
   private _isLoggedOn = false
   private _username: string | null = null
   private _status: SteamAccountConnectionStatus = 'disconnected'
@@ -41,7 +78,7 @@ export class SteamAccountManager extends EventEmitter {
       const onLoggedOn = () => {
         cleanup()
         this._isLoggedOn = true
-        this.originalPersonaState = SteamUser.EPersonaState.Online
+        // originalPersonaState removed — state is read from localconfig.vdf
         this._setStatus('connected')
         resolve()
       }
@@ -62,17 +99,28 @@ export class SteamAccountManager extends EventEmitter {
       client.once('loggedOn', onLoggedOn)
       client.once('error', onError)
 
-      // Try to get display name from accountInfo event
+      // Grab display name and accountId from accountInfo
       client.once('accountInfo', (name: string) => {
         this._username = name
-        // Re-emit status-changed so renderer shows the name
         this._setStatus('connected')
       })
 
-      client.on('disconnected', () => {
+      // Save original persona state before we ever touch it
+      client.once('loggedOn', (details: { client_steamid?: { accountid?: number } }) => {
+        const accountId = details?.client_steamid?.accountid ?? null
+        if (accountId) {
+          this._accountId = accountId
+          const stateNum = readPersonaStateDesired(accountId)
+          this._originalPersonaStateName = PERSONA_STATE_NAMES[stateNum] ?? 'online'
+          console.log(`[steam-account] Original persona state: ${this._originalPersonaStateName} (${stateNum})`)
+        }
+      })
+
+      client.on('disconnected', (_eresult: number, msg?: string) => {
         if (this._isLoggedOn) {
           this._isLoggedOn = false
           this._setStatus('disconnected')
+          console.log(`[steam-account] Disconnected: ${msg}`)
         }
       })
 
@@ -81,6 +129,24 @@ export class SteamAccountManager extends EventEmitter {
           this._isLoggedOn = true
           this._setStatus('connected')
         }
+      })
+
+      // Persistent error handler — prevents UnhandledPromiseRejection crashes.
+      // LoggedInElsewhere happens when steam-user opens a second CM session
+      // while the main Steam client is already logged in with the same account.
+      // We handle it gracefully: disconnect silently without crashing.
+      client.on('error', (err: Error & { eresult?: number }) => {
+        const isElsewhere = err?.eresult === 6 || err?.message?.includes('LoggedInElsewhere')
+        if (isElsewhere) {
+          console.warn('[steam-account] LoggedInElsewhere — steam-user session conflicted with main Steam client. Disconnecting gracefully.')
+        } else {
+          console.error('[steam-account] steam-user error:', err?.message)
+        }
+        this._isLoggedOn = false
+        this._username = null
+        this._setStatus('disconnected')
+        // Tear down silently so autoRelogin doesn't keep retrying
+        try { client.logOff() } catch { /* ok */ }
       })
 
       client.logOn({ refreshToken })
@@ -168,25 +234,16 @@ export class SteamAccountManager extends EventEmitter {
 
   // ─── Status helpers ───────────────────────────────────────────────────────
   setInvisible(): void {
-    if (!this.client || !this._isLoggedOn) return
-    this.client.setPersona(SteamUser.EPersonaState.Invisible)
-    console.log('[steam-account] Status set to Invisible')
+    if (!this._isLoggedOn) return
+    setPersonaViaProtocol('invisible')
+    console.log('[steam-account] Status set to Invisible (via steam:// protocol)')
   }
 
   restoreStatus(): void {
-    if (!this.client || !this._isLoggedOn) return
-    this.client.setPersona(this.originalPersonaState)
-    console.log(`[steam-account] Status restored to ${this.originalPersonaState}`)
-  }
-
-  setPlayingGame(appId: number): void {
-    if (!this.client || !this._isLoggedOn) return
-    this.client.gamesPlayed([appId])
-  }
-
-  clearPlayingGame(): void {
-    if (!this.client || !this._isLoggedOn) return
-    this.client.gamesPlayed([])
+    if (!this._isLoggedOn) return
+    const state = this._originalPersonaStateName as Parameters<typeof setPersonaViaProtocol>[0]
+    setPersonaViaProtocol(state)
+    console.log(`[steam-account] Status restored to ${state} (via steam:// protocol)`)
   }
 
   // ─── Cleanup ──────────────────────────────────────────────────────────────

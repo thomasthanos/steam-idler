@@ -372,7 +372,6 @@ class SteamClient {
                             iconUrl: `https://cdn.cloudflare.steamstatic.com/steam/apps/${g.appid}/capsule_231x87.jpg`,
                             headerImageUrl: `https://cdn.cloudflare.steamstatic.com/steam/apps/${g.appid}/header.jpg`,
                             playtimeForever: g.playtime_forever,
-                            playtime2Weeks: g.playtime_2weeks,
                             achievementCount: 0, achievementsUnlocked: 0, achievementPercentage: 0,
                             lastPlayed: g.rtime_last_played ?? 0,
                         }));

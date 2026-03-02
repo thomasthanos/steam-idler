@@ -35,13 +35,13 @@ function AutoIdleIcon({ size = 16, color = 'currentColor' }: { size?: number; co
 
 const navItems = [
   { to: '/home',  icon: Home,     label: 'Home'    },
-  { to: '/games', icon: Gamepad2, label: 'Library' },
+  { to: '/games', icon: Gamepad2, label: 'Achievements' },
 ]
 
 // ── Component ───────────────────────────────────────────────────────────────
 
 export default function Sidebar() {
-  const { steamRunning, user, games } = useAppContext()
+  const { steamRunning, user, recentGames } = useAppContext()
   const navigate = useNavigate()
   const [idlingCount, setIdlingCount] = useState(0)
 
@@ -55,12 +55,6 @@ export default function Sidebar() {
     const t = setInterval(refresh, 5000)
     return () => clearInterval(t)
   }, [])
-
-  const recentGames = [...games]
-    .filter(g => (g.lastPlayed ?? 0) > 0)
-    .sort((a, b) => (b.lastPlayed ?? 0) - (a.lastPlayed ?? 0))
-    .slice(0, 5)
-
 
   // ── Nav link ──────────────────────────────────────────────────────────────
   function NavItem({ to, icon: Icon, svgIcon, label, badge }: {
@@ -159,22 +153,32 @@ export default function Sidebar() {
         />
       </nav>
 
-      {/* ── Recent games ── */}
+      {/* ── Last Played ── */}
       {recentGames.length > 0 && (
-        <div className="px-2.5 pt-2.5 pb-2 flex-1 min-h-0 overflow-hidden" style={{ borderBottom: '1px solid var(--border)' }}>
-          <SectionLabel label="Recent" />
+        <div className="px-2 pt-3 pb-2" style={{ borderBottom: '1px solid var(--border)' }}>
+          <SectionLabel label="Last Played" />
           <div className="space-y-0.5">
-            {recentGames.map(game => (
+            {recentGames.slice(0, 2).map(game => (
               <button
                 key={game.appId}
                 onClick={() => navigate(`/achievements/${game.appId}`)}
-                className="sidebar-item-hover w-full flex items-center gap-2 px-2 py-1.5 rounded-lg transition-all duration-150 group text-left"
-                style={{ color: 'var(--sub)' }}
+                className="w-full flex items-center gap-2.5 px-2 py-2 rounded-xl transition-all duration-150 group text-left"
+                style={{ color: 'var(--sub)', border: '1px solid transparent' }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.04)'
+                  e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.background = 'transparent'
+                  e.currentTarget.style.borderColor = 'transparent'
+                }}
               >
-                <div className="w-7 h-4 rounded overflow-hidden shrink-0" style={{ border: '1px solid var(--border)' }}>
+                <div className="w-8 h-5 rounded overflow-hidden shrink-0" style={{ border: '1px solid var(--border)' }}>
                   <GameImage appId={game.appId} name={game.name} />
                 </div>
-                <p className="text-xs font-medium truncate flex-1 min-w-0" style={{ color: 'var(--text)' }}>{game.name}</p>
+                <p className="text-xs font-medium truncate flex-1 min-w-0" style={{ color: 'var(--text)' }}>
+                  {game.name}
+                </p>
                 <ChevronRight className="w-2.5 h-2.5 opacity-0 group-hover:opacity-40 transition-opacity shrink-0" style={{ color: 'var(--sub)' }} />
               </button>
             ))}

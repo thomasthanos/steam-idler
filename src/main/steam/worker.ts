@@ -23,7 +23,7 @@ function send(id: number, ok: boolean, data?: unknown, error?: string) {
 interface WorkerMessage {
   id: number
   type: 'INIT' | 'GET_ACHIEVEMENTS' | 'SET_ACHIEVEMENT' | 'SET_ALL_ACHIEVEMENTS'
-       | 'GET_STATS' | 'SET_STAT' | 'RESET_STATS' | 'EXIT' | 'IDLE'
+       | 'RESET_STATS' | 'EXIT' | 'IDLE'
   appId?: number
   apiName?: string
   unlocked?: boolean
@@ -40,21 +40,11 @@ interface SchemaAchievement {
   icongray: string
 }
 
-interface SchemaStats {
-  name: string
-  defaultvalue: number
-  displayName: string
-}
-
 // ─── Helpers ────────────────────────────────────────────────────────────────
-async function fetchSchema(appId: number, apiKey: string) {
+async function fetchSchema(appId: number, apiKey: string): Promise<SchemaAchievement[]> {
   const url = `https://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/?key=${apiKey}&appid=${appId}&l=english`
   const res = await axios.get(url, { timeout: 10000 })
-  const stats = res?.data?.game?.availableGameStats
-  return {
-    achievements: (stats?.achievements ?? []) as SchemaAchievement[],
-    stats: (stats?.stats ?? []) as SchemaStats[],
-  }
+  return (res?.data?.game?.availableGameStats?.achievements ?? []) as SchemaAchievement[]
 }
 
 // ─── Handlers ────────────────────────────────────────────────────────────────
@@ -136,9 +126,9 @@ async function handleGetAchievements(id: number) {
   if (!storedApiKey) { send(id, false, undefined, 'Steam API key required to load achievements. Add one in Settings.'); return }
 
   try {
-    const schema = await fetchSchema(currentAppId, storedApiKey)
+    const achievements = await fetchSchema(currentAppId, storedApiKey)
 
-    if (schema.achievements.length === 0) {
+    if (achievements.length === 0) {
       send(id, true, [])
       return
     }
@@ -167,7 +157,7 @@ async function handleGetAchievements(id: number) {
       )
     } catch { /* fall back to local steamworks */ }
 
-    const achievements = schema.achievements.map((s) => {
+    const achievementList = achievements.map((s) => {
       const web = webAchMap[s.name]
       const unlocked = web !== undefined ? web.achieved : client!.achievement.isActivated(s.name)
       const unlockedAt = web?.unlocktime && web.unlocktime > 0 ? web.unlocktime : undefined
@@ -184,7 +174,7 @@ async function handleGetAchievements(id: number) {
       }
     })
 
-    send(id, true, achievements)
+    send(id, true, achievementList)
   } catch (e: unknown) {
     send(id, false, undefined, (e as Error).message)
   }
@@ -192,7 +182,7 @@ async function handleGetAchievements(id: number) {
 
 // Sentinel returned when activate() persistently returns false, signalling
 // the caller (client.ts) to restart the worker and retry.
-export const STATS_NOT_RECEIVED_SENTINEL = 'STATS_NOT_RECEIVED'
+const STATS_NOT_RECEIVED_SENTINEL = 'STATS_NOT_RECEIVED'
 
 async function handleSetAchievement(id: number, apiName: string, unlocked: boolean) {
   console.error(`[worker] SET_ACHIEVEMENT: ${apiName} -> unlocked=${unlocked}, client=${!!client}, statsReady=${statsReady}`)
@@ -265,7 +255,7 @@ async function handleSetAllAchievements(id: number, unlocked: boolean) {
   if (!client) { send(id, false, undefined, 'Not initialised'); return }
   if (!storedApiKey) { send(id, false, undefined, 'Steam API key required. Add one in Settings.'); return }
   try {
-    const schema = await fetchSchema(currentAppId, storedApiKey)
+    const achievements = await fetchSchema(currentAppId, storedApiKey)
 
     // Pump callbacks first so UserStatsReceived is guaranteed to have fired
     const MAX_PUMP = 20
@@ -274,10 +264,10 @@ async function handleSetAllAchievements(id: number, unlocked: boolean) {
     for (let i = 0; i < MAX_PUMP; i++) {
       try { runCallbacks?.() } catch { /* ok */ }
       // Test with first achievement to see if stats are ready
-      if (schema.achievements.length > 0) {
+      if (achievements.length > 0) {
         const test = unlocked
-          ? client.achievement.activate(schema.achievements[0].name)
-          : client.achievement.clear(schema.achievements[0].name)
+          ? client.achievement.activate(achievements[0].name)
+          : client.achievement.clear(achievements[0].name)
         if (test) { pumped = true; break }
       } else {
         pumped = true; break
@@ -285,46 +275,18 @@ async function handleSetAllAchievements(id: number, unlocked: boolean) {
       await new Promise(r => setTimeout(r, PUMP_DELAY))
     }
 
-    if (!pumped && schema.achievements.length > 0) {
+    if (!pumped && achievements.length > 0) {
       send(id, false, undefined, 'Steam stats not ready. Make sure Steam is running.')
       return
     }
 
     // Apply to rest of achievements (first one already done above)
-    for (const a of schema.achievements.slice(1)) {
+    for (const a of achievements.slice(1)) {
       if (unlocked) client.achievement.activate(a.name)
       else client.achievement.clear(a.name)
     }
     client.stats.store()
-    send(id, true, { count: schema.achievements.length })
-  } catch (e: unknown) {
-    send(id, false, undefined, (e as Error).message)
-  }
-}
-
-async function handleGetStats(id: number) {
-  if (!client) { send(id, false, undefined, 'Not initialised'); return }
-  if (!storedApiKey) { send(id, false, undefined, 'Steam API key required. Add one in Settings.'); return }
-  try {
-    const schema = await fetchSchema(currentAppId, storedApiKey)
-    const stats = schema.stats.map((s) => ({
-      apiName: s.name,
-      displayName: s.displayName || s.name,
-      value: client!.stats.getInt(s.name) ?? 0,
-      defaultValue: s.defaultvalue,
-    }))
-    send(id, true, stats)
-  } catch (e: unknown) {
-    send(id, false, undefined, (e as Error).message)
-  }
-}
-
-function handleSetStat(id: number, apiName: string, value: number) {
-  if (!client) { send(id, false, undefined, 'Not initialised'); return }
-  try {
-    client.stats.setInt(apiName, Math.round(value))
-    client.stats.store()
-    send(id, true)
+    send(id, true, { count: achievements.length })
   } catch (e: unknown) {
     send(id, false, undefined, (e as Error).message)
   }
@@ -367,8 +329,6 @@ process.stdin.on('data', (chunk: string) => {
       case 'GET_ACHIEVEMENTS':     handleGetAchievements(msg.id); break
       case 'SET_ACHIEVEMENT':      handleSetAchievement(msg.id, msg.apiName!, msg.unlocked!); break
       case 'SET_ALL_ACHIEVEMENTS': handleSetAllAchievements(msg.id, msg.unlocked!); break
-      case 'GET_STATS':            handleGetStats(msg.id); break
-      case 'SET_STAT':             handleSetStat(msg.id, msg.apiName!, msg.value!); break
       case 'RESET_STATS':          handleResetStats(msg.id); break
       case 'EXIT':                 process.exit(0); break
       case 'IDLE':                 handleIdle(msg.id); break

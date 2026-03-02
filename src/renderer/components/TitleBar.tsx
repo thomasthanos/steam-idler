@@ -1,5 +1,4 @@
-import { Minus, Square, X, Settings } from 'lucide-react'
-import { useNavigate, useMatch } from 'react-router-dom'
+import { Minus, Square, X } from 'lucide-react'
 
 // Steam logo SVG (faithful to the original shape)
 function SteamIcon({ size = 16 }: { size?: number }) {
@@ -32,8 +31,6 @@ function SteamIcon({ size = 16 }: { size?: number }) {
 }
 
 export default function TitleBar() {
-  const navigate = useNavigate()
-  const isSettings = useMatch('/settings')
   return (
     <div
       className="flex items-center h-9 drag-region z-50 shrink-0"
@@ -48,34 +45,6 @@ export default function TitleBar() {
       </div>
 
       <div className="flex-1" />
-
-      {/* Settings button */}
-      <button
-        onClick={() => navigate('/settings')}
-        className="no-drag group flex items-center gap-1.5 px-3 h-full transition-all duration-200"
-        style={{
-          color: isSettings ? 'var(--accent)' : 'var(--muted)',
-          background: isSettings ? 'rgba(59,130,246,0.08)' : 'transparent',
-          borderLeft: '1px solid var(--border)',
-          borderRight: '1px solid var(--border)',
-        }}
-        onMouseEnter={e => {
-          if (!isSettings) {
-            e.currentTarget.style.background = 'rgba(255,255,255,0.05)'
-            e.currentTarget.style.color = 'var(--sub)'
-          }
-        }}
-        onMouseLeave={e => {
-          if (!isSettings) {
-            e.currentTarget.style.background = 'transparent'
-            e.currentTarget.style.color = 'var(--muted)'
-          }
-        }}
-        title="Settings"
-      >
-        <Settings className="w-3.5 h-3.5 transition-transform duration-200 group-hover:rotate-45" />
-        <span className="text-xs font-medium">Settings</span>
-      </button>
 
       {/* Window controls */}
       <div className="flex no-drag h-full">

@@ -10,6 +10,12 @@
  * Fix #10 – IdleManager extends EventEmitter so the main window can subscribe
  *           to 'changed' events and update the tray icon immediately instead of
  *           waiting for the 5 s polling interval.
+ *
+ * NOTE: Auto-invisible via steam-user is intentionally disabled.
+ * steam-user.setPlayingGame() opens a second CM session which conflicts with
+ * the steamworks.js worker → Steam sends LoggedInElsewhere to the worker →
+ * worker exits → idle stops. The worker already advertises the playing state
+ * natively via sw.init(appId), so steam-user is not needed for idle.
  */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
@@ -60,7 +66,6 @@ class IdleManager extends events_1.EventEmitter {
         this.idlers = new Map();
         this.names = new Map();
         this.steamAccountManager = null;
-        this.statusChangeAttempted = false;
     }
     get workerPath() {
         return path.join(__dirname, 'worker.js')
@@ -74,7 +79,6 @@ class IdleManager extends events_1.EventEmitter {
             return;
         if (name)
             this.names.set(appId, name);
-        const wasEmpty = this.idlers.size === 0;
         const proc = (0, child_process_1.spawn)(process.execPath, [this.workerPath], {
             env: {
                 ...process.env,
@@ -101,11 +105,13 @@ class IdleManager extends events_1.EventEmitter {
         });
         this.idlers.set(appId, proc);
         console.log(`[idle] Started idling appId=${appId}`);
-        this.emit('changed');
-        // ── Auto-invisible: trigger on first game ────────────────────────────
-        if (wasEmpty && !this.statusChangeAttempted) {
-            this._trySetInvisible(appId);
+        // Set invisible when the first game starts idling (if setting enabled)
+        if (this.idlers.size === 1 && this.steamAccountManager?.isConnected) {
+            const { autoInvisibleWhenIdling } = (0, store_1.getStore)().get('settings');
+            if (autoInvisibleWhenIdling)
+                this.steamAccountManager.setInvisible();
         }
+        this.emit('changed');
     }
     stopIdle(appId) {
         const proc = this.idlers.get(appId);
@@ -139,11 +145,13 @@ class IdleManager extends events_1.EventEmitter {
         this.idlers.delete(appId);
         this.names.delete(appId);
         console.log(`[idle] Stopped idling appId=${appId}`);
-        this.emit('changed');
-        // ── Auto-invisible: restore on last game ─────────────────────────────
-        if (this.idlers.size === 0 && this.statusChangeAttempted) {
-            this._tryRestoreStatus();
+        // Restore status when the last game stops idling (if setting enabled)
+        if (this.idlers.size === 0 && this.steamAccountManager?.isConnected) {
+            const { autoInvisibleWhenIdling } = (0, store_1.getStore)().get('settings');
+            if (autoInvisibleWhenIdling)
+                this.steamAccountManager.restoreStatus();
         }
+        this.emit('changed');
     }
     getIdlingAppIds() {
         return [...this.idlers.keys()];
@@ -157,50 +165,35 @@ class IdleManager extends events_1.EventEmitter {
     isIdling(appId) {
         return this.idlers.has(appId);
     }
-    stopAll() {
-        for (const appId of [...this.idlers.keys()]) {
-            this.stopIdle(appId);
+    stopAll(opts = {}) {
+        if (opts.skipRestore) {
+            // During app quit: kill processes without touching Steam persona state
+            for (const [appId, proc] of [...this.idlers.entries()]) {
+                try {
+                    proc.stdin.end();
+                }
+                catch { /* ok */ }
+                const pid = proc.pid;
+                if (pid !== undefined) {
+                    (0, tree_kill_1.default)(pid, 'SIGKILL', () => { });
+                }
+                else {
+                    try {
+                        proc.kill('SIGKILL');
+                    }
+                    catch { /* ok */ }
+                }
+                console.log(`[idle] Stopped idling appId=${appId}`);
+            }
+            this.idlers.clear();
+            this.names.clear();
+            this.emit('changed');
         }
-        this.names.clear();
-    }
-    // ─── Private helpers ─────────────────────────────────────────────────────
-    _trySetInvisible(appId) {
-        const mgr = this.steamAccountManager;
-        if (!mgr?.isConnected)
-            return;
-        try {
-            const settings = (0, store_1.getStore)().get('settings');
-            if (!settings.autoInvisibleWhenIdling)
-                return;
-        }
-        catch {
-            return;
-        }
-        try {
-            mgr.setInvisible();
-            mgr.setPlayingGame(appId);
-            this.statusChangeAttempted = true;
-            console.log('[idle] Auto-invisible activated');
-        }
-        catch (e) {
-            console.error('[idle] Failed to set invisible:', e);
-        }
-    }
-    _tryRestoreStatus() {
-        const mgr = this.steamAccountManager;
-        if (!mgr?.isConnected) {
-            this.statusChangeAttempted = false;
-            return;
-        }
-        try {
-            mgr.restoreStatus();
-            mgr.clearPlayingGame();
-            this.statusChangeAttempted = false;
-            console.log('[idle] Auto-invisible restored');
-        }
-        catch (e) {
-            console.error('[idle] Failed to restore status:', e);
-            this.statusChangeAttempted = false;
+        else {
+            for (const appId of [...this.idlers.keys()]) {
+                this.stopIdle(appId);
+            }
+            this.names.clear();
         }
     }
 }
