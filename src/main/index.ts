@@ -456,6 +456,12 @@ app.whenReady().then(async () => {
   })
 })
 
+// Set isQuitting=true before window close events fire so the mainWindow
+// close handler doesn't call e.preventDefault() (minimizeToTray path)
+// or let forceQuit() call app.exit(0) — both of which would prevent
+// autoUpdater.quitAndInstall() from running the installer.
+app.on('before-quit', () => { isQuitting = true })
+
 app.on('window-all-closed', () => {
   if (process.platform === 'darwin') return
   const settings = getStore().get('settings')
@@ -486,7 +492,3 @@ export function forceQuit() {
     })
 }
 
-// before-quit intentionally omitted: forceQuit() is triggered by
-// window-all-closed (native close) or explicitly from the IPC/tray Quit handler.
-// Hooking before-quit would double-invoke forceQuit() and conflicts with
-// autoUpdater.quitAndInstall() which also calls app.quit() internally.

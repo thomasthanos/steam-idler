@@ -103,6 +103,10 @@ export function performStartupUpdateCheck(
 
     // ── Update check event handlers ──────────────────────────────────
     const onAvailable = (info: UpdateInfo) => {
+      // Cancel safety timer: we now wait for download to complete (or fail).
+      // Without this, a slow download would let the 12 s timer fire and open
+      // the main window while the update is still being downloaded/installed.
+      if (safetyTimer) { clearTimeout(safetyTimer); safetyTimer = null }
       onEvent({ type: 'status', text: `Update v${info.version} found — downloading…` })
       autoUpdater.downloadUpdate().catch((err: Error) => onError(err))
       // updateDone intentionally NOT set — we wait for onDownloaded or error
