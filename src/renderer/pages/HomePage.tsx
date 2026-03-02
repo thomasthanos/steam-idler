@@ -278,23 +278,10 @@ function IdlingNowWidget({ games }: { games: { appId: number; name: string }[] }
 
 // ─── Main ──────────────────────────────────────────────────────────────────
 export default function HomePage() {
-  const { steamRunning, settings, games } = useAppContext()
+  const { steamRunning, settings, games, featuredData, isLoadingFeatured } = useAppContext()
   const navigate = useNavigate()
-  const [deals, setDeals]         = useState<FeaturedGame[]>([])
-  const [featured, setFeatured]   = useState<FeaturedGame[]>([])
-  const [freeGames, setFreeGames] = useState<FeaturedGame[]>([])
-  const [loadingDeals, setLoadingDeals] = useState(true)
-
-  useEffect(() => {
-    setLoadingDeals(true)
-    window.steam.getSteamFeatured().then(res => {
-      if (res.success && res.data) {
-        setDeals(res.data.deals)
-        setFeatured(res.data.featured)
-        setFreeGames(res.data.freeGames ?? [])
-      }
-    }).finally(() => setLoadingDeals(false))
-  }, [])
+  const { deals, featured, freeGames } = featuredData
+  const loadingDeals = isLoadingFeatured
 
   // Idling status
   const [idlingGames, setIdlingGames] = useState<{ appId: number; name: string }[]>([])

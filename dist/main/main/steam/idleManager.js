@@ -191,9 +191,8 @@ class IdleManager extends events_1.EventEmitter {
         }
         else {
             for (const appId of [...this.idlers.keys()]) {
-                this.stopIdle(appId);
+                this.stopIdle(appId); // stopIdle already handles names.delete(appId)
             }
-            this.names.clear();
         }
     }
 }

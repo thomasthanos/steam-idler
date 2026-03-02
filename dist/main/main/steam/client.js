@@ -63,36 +63,66 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.SteamClient = void 0;
 const child_process_1 = require("child_process");
 const path = __importStar(require("path"));
+const fs = __importStar(require("fs"));
 const axios_1 = __importDefault(require("axios"));
+const electron_1 = require("electron");
 const steamPaths_1 = require("./steamPaths");
 const store_1 = require("../store");
 // ─── Persistent settings ───────────────────────────────────────────────────
-// Uses the shared lazy singleton from store.ts so that app.setPath('userData')
-// in index.ts is guaranteed to have run before the store is first opened.
-// A local `new Store()` at module-level would be created during the import
-// phase — before app.setPath() executes — and would therefore resolve to the
-// wrong (default Electron) userData directory.
 function getSettings() { return (0, store_1.getStore)().get('settings'); }
-// ─── Games cache ────────────────────────────────────────────────────────────
+// ─── Games cache (separate file — keeps config.json small) ─────────────────
+//
+// Stored format omits iconUrl / headerImageUrl — these are always:
+//   https://cdn.cloudflare.steamstatic.com/steam/apps/<appId>/capsule_231x87.jpg
+//   https://cdn.cloudflare.steamstatic.com/steam/apps/<appId>/header.jpg
+// and are reconstructed on load, saving ~120 bytes per game (~60 KB for 500 games).
 const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
-// Bump this whenever the shape of cached data changes so stale caches are
-// automatically invalidated on the next launch instead of showing wrong data.
-const CACHE_VERSION = 2;
+const CACHE_VERSION = 3; // bump when slim format changes
+function getCacheFilePath() {
+    return path.join(electron_1.app.getPath('userData'), 'games-cache.json');
+}
+function inflateGame(slim) {
+    return {
+        ...slim,
+        iconUrl: `https://cdn.cloudflare.steamstatic.com/steam/apps/${slim.appId}/capsule_231x87.jpg`,
+        headerImageUrl: `https://cdn.cloudflare.steamstatic.com/steam/apps/${slim.appId}/header.jpg`,
+    };
+}
 function getCachedGames() {
-    const cached = (0, store_1.getStore)().get('gamesCache');
-    if (!cached)
-        return null;
-    if (cached.version !== CACHE_VERSION)
-        return null; // schema changed
-    if (Date.now() - cached.timestamp > CACHE_TTL_MS)
-        return null;
-    return cached.data;
+    try {
+        const raw = fs.readFileSync(getCacheFilePath(), 'utf8');
+        const cache = JSON.parse(raw);
+        if (cache.version !== CACHE_VERSION)
+            return null;
+        if (Date.now() - cache.timestamp > CACHE_TTL_MS)
+            return null;
+        return cache.data.map(inflateGame);
+    }
+    catch {
+        return null; // file missing or corrupt — rebuild on next call
+    }
 }
 function setCachedGames(data) {
-    (0, store_1.getStore)().set('gamesCache', { data, timestamp: Date.now(), version: CACHE_VERSION });
+    try {
+        // Strip predictable URL fields before writing
+        const slim = data.map(({ iconUrl: _i, headerImageUrl: _h, ...rest }) => rest);
+        const cache = { version: CACHE_VERSION, timestamp: Date.now(), data: slim };
+        fs.writeFileSync(getCacheFilePath(), JSON.stringify(cache), 'utf8');
+        // Also remove the old embedded cache from config.json if it's still there
+        if ((0, store_1.getStore)().has('gamesCache'))
+            (0, store_1.getStore)().delete('gamesCache');
+    }
+    catch (e) {
+        console.warn('[cache] Failed to write games-cache.json:', e);
+    }
 }
 function clearGamesCache() {
-    (0, store_1.getStore)().delete('gamesCache');
+    try {
+        fs.unlinkSync(getCacheFilePath());
+    }
+    catch { /* ok — file may not exist */ }
+    if ((0, store_1.getStore)().has('gamesCache'))
+        (0, store_1.getStore)().delete('gamesCache');
 }
 class WorkerBridge {
     constructor() {
@@ -299,6 +329,11 @@ function detectSteamProcess() {
 }
 // ─── SteamClient (main-process API) ────────────────────────────────────────
 class SteamClient {
+    constructor() {
+        // In-memory caches — populated during splash preload, reused by renderer IPC calls.
+        this._userInfoCache = null;
+        this._featuredCache = null;
+    }
     // ── Steam Running ─────────────────────────────────────────────────────────
     // Uses process detection instead of sw.init(480) to avoid "Spacewar" appearing.
     async isSteamRunning() {
@@ -306,6 +341,10 @@ class SteamClient {
     }
     // ── User Info ─────────────────────────────────────────────────────────────
     async getUserInfo() {
+        // Return cached result if fresh — avoids duplicate Steam API calls after splash preload.
+        if (this._userInfoCache && Date.now() - this._userInfoCache.ts < SteamClient.USER_INFO_TTL) {
+            return this._userInfoCache.data;
+        }
         const settings = getSettings();
         let steamId64 = settings.steamId || '';
         let personaName = 'Steam User';
@@ -340,13 +379,65 @@ class SteamClient {
             const initials = personaName.slice(0, 2).toUpperCase() || 'ST';
             avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(initials)}&background=1a9fff&color=fff&size=128&bold=true`;
         }
-        return {
+        const result = {
             steamId: steamId64,
             personaName,
             avatarUrl,
             profileUrl: `https://steamcommunity.com/profiles/${steamId64}`,
             level,
         };
+        this._userInfoCache = { data: result, ts: Date.now() };
+        return result;
+    }
+    // ── Steam Featured / Deals — preloaded during splash, cached for instant renderer load
+    async getSteamFeatured() {
+        if (this._featuredCache && Date.now() - this._featuredCache.ts < SteamClient.FEATURED_TTL) {
+            return this._featuredCache.data;
+        }
+        const [catRes, featRes] = await Promise.allSettled([
+            axios_1.default.get('https://store.steampowered.com/api/featuredcategories/?cc=us&l=english', { timeout: 8000 }),
+            axios_1.default.get('https://store.steampowered.com/api/featured/?cc=us&l=english', { timeout: 8000 }),
+        ]);
+        const deals = [], featured = [], freeGames = [];
+        const seen = new Set();
+        const toGame = (item, type) => ({
+            id: item.id, name: item.name,
+            header_image: item.header_image || `https://cdn.cloudflare.steamstatic.com/steam/apps/${item.id}/header.jpg`,
+            discount_percent: item.discount_percent ?? 0,
+            final_price: item.final_price ?? 0,
+            original_price: item.original_price ?? 0,
+            type: (item.final_price === 0 && item.original_price === 0) ? 'free'
+                : (item.discount_percent ?? 0) > 0 ? 'sale' : type,
+            url: `https://store.steampowered.com/app/${item.id}`,
+        });
+        if (catRes.status === 'fulfilled') {
+            for (const item of (catRes.value.data?.specials?.items ?? []).slice(0, 8)) {
+                if (!item.id || seen.has(item.id))
+                    continue;
+                seen.add(item.id);
+                deals.push(toGame(item, 'sale'));
+            }
+            const freePool = [...(catRes.value.data?.free_to_play?.items ?? []), ...(catRes.value.data?.free_weekend?.items ?? [])];
+            for (const item of freePool.slice(0, 6)) {
+                if (!item.id || seen.has(item.id))
+                    continue;
+                seen.add(item.id);
+                freeGames.push(toGame(item, 'free'));
+            }
+        }
+        if (featRes.status === 'fulfilled') {
+            for (const cat of ['large_capsules', 'featured_win', 'featured_mac']) {
+                for (const item of (featRes.value.data?.[cat] ?? [])) {
+                    if (!item.id || seen.has(item.id))
+                        continue;
+                    seen.add(item.id);
+                    featured.push(toGame(item, 'featured'));
+                }
+            }
+        }
+        const data = { deals: deals.slice(0, 8), featured: featured.slice(0, 6), freeGames: freeGames.slice(0, 6) };
+        this._featuredCache = { data, ts: Date.now() };
+        return data;
     }
     // ── Recent Games ──────────────────────────────────────────────────────────
     async getRecentGames() {
@@ -576,3 +667,5 @@ class SteamClient {
     }
 }
 exports.SteamClient = SteamClient;
+SteamClient.USER_INFO_TTL = 5 * 60 * 1000;
+SteamClient.FEATURED_TTL = 5 * 60 * 1000;

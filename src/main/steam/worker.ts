@@ -286,6 +286,16 @@ async function handleSetAllAchievements(id: number, unlocked: boolean) {
       else client.achievement.clear(a.name)
     }
     client.stats.store()
+
+    // Flush: give Steamworks enough runCallbacks() ticks to persist the batch.
+    // Same reasoning as single-achievement flush in handleSetAchievement.
+    const FLUSH_MS   = 600
+    const FLUSH_TICK = 50
+    const flushStart = Date.now()
+    while (Date.now() - flushStart < FLUSH_MS) {
+      await new Promise(r => setTimeout(r, FLUSH_TICK))
+    }
+
     send(id, true, { count: achievements.length })
   } catch (e: unknown) {
     send(id, false, undefined, (e as Error).message)

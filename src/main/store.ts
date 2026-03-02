@@ -1,9 +1,10 @@
 import Store from 'electron-store'
-import { AppSettings, DEFAULT_SETTINGS, SteamGame } from '../shared/types'
+import { AppSettings, DEFAULT_SETTINGS } from '../shared/types'
 
 interface StoreSchema {
   settings: AppSettings
-  gamesCache?: { data: SteamGame[]; timestamp: number }
+  /** @deprecated Moved to games-cache.json — kept here only so migration cleanup in client.ts can compile */
+  gamesCache?: unknown
 }
 
 // Lazy singleton — created on first access, AFTER app.setPath('userData') has been called.

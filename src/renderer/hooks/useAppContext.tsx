@@ -1,7 +1,13 @@
 // @refresh reset
 import { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react'
-import { SteamUser, AppSettings, DEFAULT_SETTINGS, SteamGame } from '@shared/types'
+import { SteamUser, AppSettings, DEFAULT_SETTINGS, SteamGame, FeaturedGame } from '@shared/types'
 import toast from 'react-hot-toast'
+
+interface FeaturedData {
+  deals: FeaturedGame[]
+  featured: FeaturedGame[]
+  freeGames: FeaturedGame[]
+}
 
 interface AppContextType {
   user: SteamUser | null
@@ -11,6 +17,8 @@ interface AppContextType {
   games: SteamGame[]
   isLoadingGames: boolean
   recentGames: SteamGame[]
+  featuredData: FeaturedData
+  isLoadingFeatured: boolean
   fetchGames: (force?: boolean) => Promise<void>
   updateSettings: (s: Partial<AppSettings>) => Promise<void>
   refreshUser: () => Promise<void>
@@ -27,6 +35,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [isLoadingGames, setIsLoadingGames] = useState(false)
   const [gamesFetched, setGamesFetched] = useState(false)
   const [recentGames, setRecentGames] = useState<SteamGame[]>([])
+  const [featuredData, setFeaturedData] = useState<FeaturedData>({ deals: [], featured: [], freeGames: [] })
+  const [isLoadingFeatured, setIsLoadingFeatured] = useState(true)
 
   // Fix #7 – Request deduplication for rapid settings saves.
   // Holds the timer id for the pending debounced flush.
@@ -69,8 +79,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [gamesFetched])
 
   const updateSettings = useCallback(async (partial: Partial<AppSettings>) => {
-    // --- Optimistic UI update (immediate) ---
-    setSettings(prev => ({ ...prev, ...partial }))
+    // --- Capture pre-update values for rollback BEFORE optimistic update ---
+    const prevValues: Partial<AppSettings> = {}
+    for (const k of Object.keys(partial) as (keyof AppSettings)[]) {
+      // Read current settings directly from the ref-stable setter closure
+      // by temporarily capturing via a state read trick — instead, we store
+      // them into the pending rollback ref before the optimistic setState.
+      ;(prevValues as Record<string, unknown>)[k] = undefined // placeholder, filled below
+    }
+    setSettings(prev => {
+      // Capture actual previous values here where prev is guaranteed correct
+      for (const k of Object.keys(partial) as (keyof AppSettings)[]) {
+        ;(prevValues as Record<string, unknown>)[k] = prev[k]
+      }
+      return { ...prev, ...partial }
+    })
 
     // --- Deduplication: merge this partial into the pending batch ---
     pendingSaveRef.current = { ...pendingSaveRef.current, ...partial }
@@ -88,14 +111,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         try {
           const res = await window.steam.setSettings(batch)
           if (!res.success) {
-            // Roll back just the keys that were in this batch
-            setSettings(prev => {
-              const rolled: Partial<AppSettings> = {}
-              for (const k of Object.keys(batch) as (keyof AppSettings)[]) {
-                ;(rolled as Record<string, unknown>)[k] = prev[k]
-              }
-              return { ...prev, ...rolled }
-            })
+            // Roll back using the pre-optimistic values captured above
+            setSettings(prev => ({ ...prev, ...prevValues }))
             reject(new Error(res.error ?? 'Failed to save settings'))
             return
           }
@@ -135,6 +152,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
       window.steam.getRecentGames().then(res => {
         if (res.success && res.data) setRecentGames(res.data)
       }).catch(() => {})
+      // Fetch Steam featured data once and cache in context
+      setIsLoadingFeatured(true)
+      window.steam.getSteamFeatured().then(res => {
+        if (res.success && res.data) {
+          setFeaturedData({
+            deals: res.data.deals ?? [],
+            featured: res.data.featured ?? [],
+            freeGames: res.data.freeGames ?? [],
+          })
+        }
+      }).catch(() => {}).finally(() => setIsLoadingFeatured(false))
     }
     init()
 
@@ -160,10 +188,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [])
 
   return (
-    <AppContext.Provider value={{
-      user, steamRunning, settings, isLoadingUser,
-      games, isLoadingGames, recentGames, fetchGames,
-      updateSettings, refreshUser,
+  <AppContext.Provider value={{
+  user, steamRunning, settings, isLoadingUser,
+  games, isLoadingGames, recentGames, fetchGames,
+  featuredData, isLoadingFeatured,
+    updateSettings, refreshUser,
     }}>
       {children}
     </AppContext.Provider>

@@ -127,12 +127,16 @@ async function runSplashFlow(onReady: () => void): Promise<void> {
 
   splash.loadFile(getSplashHtmlPath())
 
-  splash.once('ready-to-show', () => {
-    splash.show()
-    // Show the current app version in the bottom-right corner
-    splash.webContents.executeJavaScript(
-      `window._setVersion(${JSON.stringify(app.getVersion())})`
-    ).catch(() => {})
+  // Wait for the splash to be ready before starting work so early status
+  // messages (e.g. "Connecting to Steam…") are not lost.
+  await new Promise<void>(resolve => {
+    splash.once('ready-to-show', () => {
+      splash.show()
+      splash.webContents.executeJavaScript(
+        `window._setVersion(${JSON.stringify(app.getVersion())})`
+      ).catch(() => {})
+      resolve()
+    })
   })
 
   // Helper: call a JS function defined in splash.html
@@ -173,7 +177,11 @@ async function runSplashFlow(onReady: () => void): Promise<void> {
 
         emit({ type: 'status',   text: 'Loading recent games…' })
         await steamClient.getRecentGames().catch(() => null)
-        emit({ type: 'progress', percent: 92 })
+        emit({ type: 'progress', percent: 88 })
+
+        emit({ type: 'status',   text: 'Loading store data…' })
+        await steamClient.getSteamFeatured().catch(() => null)
+        emit({ type: 'progress', percent: 96 })
       } else {
         emit({ type: 'status',   text: 'Steam not running — launching anyway…' })
         emit({ type: 'progress', percent: 92 })

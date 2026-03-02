@@ -153,6 +153,19 @@ function setupIpcHandlers(steam, idle, steamAccount) {
     });
     // ── Steam Store Featured / Deals (proxied from main to avoid CORS) ────────
     electron_1.ipcMain.handle(types_1.IPC.GET_STEAM_FEATURED, async () => {
+        // Delegate to steamClient which caches the result — the splash preload
+        // calls steamClient.getSteamFeatured() so this returns instantly on first
+        // renderer request after the app opens.
+        try {
+            const data = await steam.getSteamFeatured();
+            return { success: true, data };
+        }
+        catch (e) {
+            return { success: false, error: e.message };
+        }
+    });
+    // (legacy inline fetch kept below for reference — no longer reachable)
+    electron_1.ipcMain.handle('__GET_STEAM_FEATURED_UNUSED__', async () => {
         try {
             const [catRes, featRes] = await Promise.allSettled([
                 axios_1.default.get('https://store.steampowered.com/api/featuredcategories/?cc=us&l=english', { timeout: 8000 }),

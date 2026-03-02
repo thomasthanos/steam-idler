@@ -149,9 +149,8 @@ export class IdleManager extends EventEmitter {
       this.emit('changed')
     } else {
       for (const appId of [...this.idlers.keys()]) {
-        this.stopIdle(appId)
+        this.stopIdle(appId)  // stopIdle already handles names.delete(appId)
       }
-      this.names.clear()
     }
   }
 }

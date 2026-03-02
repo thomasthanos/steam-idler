@@ -27,6 +27,7 @@ import { ChildProcess, spawn, execSync } from 'child_process'
 import * as path from 'path'
 import * as fs from 'fs'
 import axios from 'axios'
+import { app } from 'electron'
 
 import {
   Achievement,
@@ -43,33 +44,66 @@ import {
 import { getStore } from '../store'
 
 // ─── Persistent settings ───────────────────────────────────────────────────
-// Uses the shared lazy singleton from store.ts so that app.setPath('userData')
-// in index.ts is guaranteed to have run before the store is first opened.
-// A local `new Store()` at module-level would be created during the import
-// phase — before app.setPath() executes — and would therefore resolve to the
-// wrong (default Electron) userData directory.
 function getSettings(): AppSettings { return getStore().get('settings') }
 
-// ─── Games cache ────────────────────────────────────────────────────────────
-const CACHE_TTL_MS = 30 * 60 * 1000 // 30 minutes
-// Bump this whenever the shape of cached data changes so stale caches are
-// automatically invalidated on the next launch instead of showing wrong data.
-const CACHE_VERSION = 2
+// ─── Games cache (separate file — keeps config.json small) ─────────────────
+//
+// Stored format omits iconUrl / headerImageUrl — these are always:
+//   https://cdn.cloudflare.steamstatic.com/steam/apps/<appId>/capsule_231x87.jpg
+//   https://cdn.cloudflare.steamstatic.com/steam/apps/<appId>/header.jpg
+// and are reconstructed on load, saving ~120 bytes per game (~60 KB for 500 games).
+
+const CACHE_TTL_MS   = 30 * 60 * 1000 // 30 minutes
+const CACHE_VERSION  = 3               // bump when slim format changes
+
+type SlimGame = Omit<SteamGame, 'iconUrl' | 'headerImageUrl'>
+
+interface GamesCache {
+  version:   number
+  timestamp: number
+  data:      SlimGame[]
+}
+
+function getCacheFilePath(): string {
+  return path.join(app.getPath('userData'), 'games-cache.json')
+}
+
+function inflateGame(slim: SlimGame): SteamGame {
+  return {
+    ...slim,
+    iconUrl:        `https://cdn.cloudflare.steamstatic.com/steam/apps/${slim.appId}/capsule_231x87.jpg`,
+    headerImageUrl: `https://cdn.cloudflare.steamstatic.com/steam/apps/${slim.appId}/header.jpg`,
+  }
+}
 
 function getCachedGames(): SteamGame[] | null {
-  const cached = getStore().get('gamesCache')
-  if (!cached) return null
-  if ((cached as any).version !== CACHE_VERSION) return null   // schema changed
-  if (Date.now() - cached.timestamp > CACHE_TTL_MS) return null
-  return cached.data
+  try {
+    const raw = fs.readFileSync(getCacheFilePath(), 'utf8')
+    const cache = JSON.parse(raw) as GamesCache
+    if (cache.version   !== CACHE_VERSION) return null
+    if (Date.now() - cache.timestamp > CACHE_TTL_MS) return null
+    return cache.data.map(inflateGame)
+  } catch {
+    return null  // file missing or corrupt — rebuild on next call
+  }
 }
 
 function setCachedGames(data: SteamGame[]): void {
-  getStore().set('gamesCache', { data, timestamp: Date.now(), version: CACHE_VERSION } as any)
+  try {
+    // Strip predictable URL fields before writing
+    const slim: SlimGame[] = data.map(({ iconUrl: _i, headerImageUrl: _h, ...rest }) => rest)
+    const cache: GamesCache = { version: CACHE_VERSION, timestamp: Date.now(), data: slim }
+    fs.writeFileSync(getCacheFilePath(), JSON.stringify(cache), 'utf8')
+    // Also remove the old embedded cache from config.json if it's still there
+    if (getStore().has('gamesCache')) getStore().delete('gamesCache')
+  } catch (e) {
+    console.warn('[cache] Failed to write games-cache.json:', e)
+  }
 }
 
 function clearGamesCache(): void {
-  getStore().delete('gamesCache')
+  try { fs.unlinkSync(getCacheFilePath()) } catch { /* ok — file may not exist */ }
+  if (getStore().has('gamesCache')) getStore().delete('gamesCache')
 }
 
 // ─── Worker bridge ─────────────────────────────────────────────────────────
@@ -281,6 +315,12 @@ function detectSteamProcess(): boolean {
 
 export class SteamClient {
 
+  // In-memory caches — populated during splash preload, reused by renderer IPC calls.
+  private _userInfoCache: { data: SteamUser; ts: number } | null = null
+  private _featuredCache: { data: { deals: unknown[]; featured: unknown[]; freeGames: unknown[] }; ts: number } | null = null
+  private static readonly USER_INFO_TTL = 5 * 60 * 1000
+  private static readonly FEATURED_TTL  = 5 * 60 * 1000
+
   // ── Steam Running ─────────────────────────────────────────────────────────
   // Uses process detection instead of sw.init(480) to avoid "Spacewar" appearing.
   async isSteamRunning(): Promise<boolean> {
@@ -289,6 +329,10 @@ export class SteamClient {
 
   // ── User Info ─────────────────────────────────────────────────────────────
   async getUserInfo(): Promise<SteamUser> {
+    // Return cached result if fresh — avoids duplicate Steam API calls after splash preload.
+    if (this._userInfoCache && Date.now() - this._userInfoCache.ts < SteamClient.USER_INFO_TTL) {
+      return this._userInfoCache.data
+    }
     const settings = getSettings()
     let steamId64 = settings.steamId || ''
     let personaName = 'Steam User'
@@ -332,13 +376,60 @@ export class SteamClient {
       avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(initials)}&background=1a9fff&color=fff&size=128&bold=true`
     }
 
-    return {
+    const result: SteamUser = {
       steamId: steamId64,
       personaName,
       avatarUrl,
       profileUrl: `https://steamcommunity.com/profiles/${steamId64}`,
       level,
     }
+    this._userInfoCache = { data: result, ts: Date.now() }
+    return result
+  }
+
+  // ── Steam Featured / Deals — preloaded during splash, cached for instant renderer load
+  async getSteamFeatured(): Promise<{ deals: unknown[]; featured: unknown[]; freeGames: unknown[] }> {
+    if (this._featuredCache && Date.now() - this._featuredCache.ts < SteamClient.FEATURED_TTL) {
+      return this._featuredCache.data
+    }
+    const [catRes, featRes] = await Promise.allSettled([
+      axios.get('https://store.steampowered.com/api/featuredcategories/?cc=us&l=english', { timeout: 8000 }),
+      axios.get('https://store.steampowered.com/api/featured/?cc=us&l=english', { timeout: 8000 }),
+    ])
+    const deals: any[] = [], featured: any[] = [], freeGames: any[] = []
+    const seen = new Set<number>()
+    const toGame = (item: any, type: string) => ({
+      id: item.id, name: item.name,
+      header_image: item.header_image || `https://cdn.cloudflare.steamstatic.com/steam/apps/${item.id}/header.jpg`,
+      discount_percent: item.discount_percent ?? 0,
+      final_price: item.final_price ?? 0,
+      original_price: item.original_price ?? 0,
+      type: (item.final_price === 0 && item.original_price === 0) ? 'free'
+          : (item.discount_percent ?? 0) > 0 ? 'sale' : type,
+      url: `https://store.steampowered.com/app/${item.id}`,
+    })
+    if (catRes.status === 'fulfilled') {
+      for (const item of (catRes.value.data?.specials?.items ?? []).slice(0, 8)) {
+        if (!item.id || seen.has(item.id)) continue
+        seen.add(item.id); deals.push(toGame(item, 'sale'))
+      }
+      const freePool = [...(catRes.value.data?.free_to_play?.items ?? []), ...(catRes.value.data?.free_weekend?.items ?? [])]
+      for (const item of freePool.slice(0, 6)) {
+        if (!item.id || seen.has(item.id)) continue
+        seen.add(item.id); freeGames.push(toGame(item, 'free'))
+      }
+    }
+    if (featRes.status === 'fulfilled') {
+      for (const cat of ['large_capsules', 'featured_win', 'featured_mac']) {
+        for (const item of (featRes.value.data?.[cat] ?? [])) {
+          if (!item.id || seen.has(item.id)) continue
+          seen.add(item.id); featured.push(toGame(item, 'featured'))
+        }
+      }
+    }
+    const data = { deals: deals.slice(0, 8), featured: featured.slice(0, 6), freeGames: freeGames.slice(0, 6) }
+    this._featuredCache = { data, ts: Date.now() }
+    return data
   }
 
   // ── Recent Games ──────────────────────────────────────────────────────────
