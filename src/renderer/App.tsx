@@ -1,5 +1,5 @@
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
-import { Toaster } from 'react-hot-toast'
+import toast, { Toaster } from 'react-hot-toast'
 import { useTheme } from './hooks/useTheme'
 import TitleBar from './components/TitleBar'
 import Sidebar from './components/Sidebar'
@@ -32,6 +32,32 @@ function AppShell() {
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
   }, [refreshUser])
+
+  // In-app toast notifications for idle warnings (always visible regardless of page)
+  useEffect(() => {
+    const cleanup = window.steam.onIdleWarning((data) => {
+      if (data.type === 'game-already-running') {
+        toast(`⚠️ A Steam game is already running (AppID: ${data.appId}). Idling may conflict with the running game.`, {
+          duration: 6000,
+          style: {
+            background: 'var(--card)',
+            color: 'var(--text)',
+            border: '1px solid rgba(245,158,11,0.4)',
+          },
+        })
+      } else if (data.type === 'manual-game-detected') {
+        toast(`🛑 A Steam game was launched (AppID: ${data.appId}). All idling has been stopped.`, {
+          duration: 5000,
+          style: {
+            background: 'var(--card)',
+            color: 'var(--text)',
+            border: '1px solid rgba(239,68,68,0.4)',
+          },
+        })
+      }
+    })
+    return cleanup
+  }, [])
 
   return (
     <div className="flex flex-col h-screen font-sans select-none overflow-hidden" style={{ background: 'var(--bg)', color: 'var(--text)' }}>

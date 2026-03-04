@@ -422,6 +422,13 @@ export default function SettingsPage() {
             <Toggle value={settings.autoInvisibleWhenIdling} onChange={() => save({ autoInvisibleWhenIdling: !settings.autoInvisibleWhenIdling })} />
           </Row>
         </div>
+
+        {/* Stop idle on game launch toggle */}
+        <div className="card">
+          <Row label="Stop idle on game launch" desc="Detect running games and stop idling automatically when you launch a game">
+            <Toggle value={settings.stopIdleOnGameLaunch} onChange={() => save({ stopIdleOnGameLaunch: !settings.stopIdleOnGameLaunch })} />
+          </Row>
+        </div>
       </div>
     </>
   )

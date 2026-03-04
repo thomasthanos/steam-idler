@@ -54,16 +54,69 @@ electron_1.app.setPath('userData', path.join(electron_1.app.getPath('appData'), 
 let mainWindow = null;
 let tray = null;
 let trayUpdateInterval = null;
-let activateListenerRegistered = false;
+let isQuitting = false;
 const steamClient = new client_1.SteamClient();
 exports.idleManager = new idleManager_1.IdleManager();
 exports.steamAccountManager = new steamUser_1.SteamAccountManager();
 exports.idleManager.setSteamAccountManager(exports.steamAccountManager);
 const isDev = process.env.NODE_ENV === 'development' || !electron_1.app.isPackaged;
+// ─── Idle notification helper ─────────────────────────────────────────────
+function showIdleNotification(title, body) {
+    try {
+        if (!electron_1.Notification.isSupported())
+            return;
+        const iconCandidates = [
+            path.join(process.resourcesPath ?? '', 'notify.png'),
+            path.join(__dirname, '../../../resources/notify.png'),
+            path.join(electron_1.app.getAppPath(), 'resources/notify.png'),
+            path.join(__dirname, '../../../resources/steam.png'),
+        ];
+        const icon = iconCandidates.find(p => { try {
+            return fs.existsSync(p);
+        }
+        catch {
+            return false;
+        } });
+        const n = new electron_1.Notification({ title, body, silent: false, icon });
+        n.on('click', () => {
+            if (mainWindow && !mainWindow.isDestroyed()) {
+                mainWindow.show();
+                mainWindow.focus();
+            }
+        });
+        n.show();
+    }
+    catch (e) {
+        console.error('[notification] Failed:', e);
+    }
+}
+// Notify when a manual game launch stops all idling
+exports.idleManager.on('manual-game-detected', (appId) => {
+    showIdleNotification('Idling Stopped', `A Steam game was launched (AppID: ${appId}). All idling has been stopped and your status has been restored.`);
+    // Also send in-app notification (toast) for when OS notifications are disabled
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('idle:warning', { type: 'manual-game-detected', appId });
+    }
+});
+// Notify when starting idle while a game is already running
+exports.idleManager.on('game-already-running', (appId) => {
+    showIdleNotification('Game Already Running', `A Steam game is currently running (AppID: ${appId}). Idling will start, but it may conflict with the running game.`);
+    // Also send in-app notification (toast) for when OS notifications are disabled
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('idle:warning', { type: 'game-already-running', appId });
+    }
+});
 // ─── Production logging ───────────────────────────────────────────────────────
 if (!isDev) {
     const logFile = path.join(electron_1.app.getPath('userData'), 'debug.log');
     try {
+        // Truncate log file if over 5 MB to prevent unbounded growth
+        try {
+            const stat = fs.statSync(logFile);
+            if (stat.size > 5 * 1024 * 1024)
+                fs.writeFileSync(logFile, '');
+        }
+        catch { /* file may not exist yet */ }
         const logStream = fs.createWriteStream(logFile, { flags: 'a' });
         const originalLog = console.log;
         const originalError = console.error;
@@ -91,10 +144,11 @@ if (!gotLock) {
 }
 else {
     electron_1.app.on('second-instance', () => {
-        if (mainWindow) {
+        if (mainWindow && !mainWindow.isDestroyed()) {
             if (mainWindow.isMinimized())
                 mainWindow.restore();
-            mainWindow.show();
+            if (!mainWindow.isVisible())
+                mainWindow.show();
             mainWindow.focus();
         }
     });
@@ -161,7 +215,9 @@ async function runSplashFlow(onReady) {
             sandbox: true,
         },
     });
-    splash.loadFile(getSplashHtmlPath());
+    splash.loadFile(getSplashHtmlPath()).catch((err) => {
+        console.error('[splash] Failed to load splash HTML:', err);
+    });
     // Wait for the splash to be ready before starting work so early status
     // messages (e.g. "Connecting to Steam…") are not lost.
     await new Promise(resolve => {
@@ -275,7 +331,7 @@ function createTray() {
                 return undefined;
             }
         };
-        const appIcon = icon.isEmpty() ? undefined : electron_1.nativeImage.createFromPath(getIconPath('32')).resize({ width: 16, height: 16 });
+        const appIcon = icon.isEmpty() ? undefined : icon.resize({ width: 16, height: 16 });
         const updateMenu = () => {
             const idlingGames = exports.idleManager.getIdlingGames();
             const idlingCount = idlingGames.length;
@@ -297,8 +353,7 @@ function createTray() {
                         icon: menuIcon('tray_stop'),
                         click: () => {
                             exports.idleManager.stopAll();
-                            mainWindow?.webContents.send('idle:changed');
-                            updateMenu();
+                            // updateMenu + idle:changed broadcast handled by 'changed' event listener
                         },
                     },
                 ]
@@ -329,9 +384,14 @@ function createTray() {
                 mainWindow?.focus();
             }
         });
-        // Fix #10 – update the tray immediately whenever idle state changes
-        // (e.g. a game starts or stops), without waiting for the polling interval.
-        exports.idleManager.on('changed', updateMenu);
+        // Fix #10 – update the tray AND renderer immediately whenever idle
+        // state changes (e.g. a game starts, stops, or a worker exits).
+        exports.idleManager.on('changed', () => {
+            updateMenu();
+            if (mainWindow && !mainWindow.isDestroyed()) {
+                mainWindow.webContents.send('idle:changed');
+            }
+        });
         // Keep a slower poll as a safety net (handles edge-cases like process crashes
         // where the 'exit' event may arrive after a delay).
         if (trayUpdateInterval)
@@ -409,13 +469,13 @@ function createWindow(startMinimized = false) {
         // window-all-closed will call forceQuit().
     });
     mainWindow.on('closed', () => { mainWindow = null; });
+}
+function setupNativeThemeListener() {
     electron_1.nativeTheme.on('updated', () => {
         mainWindow?.webContents.send('theme:changed', electron_1.nativeTheme.shouldUseDarkColors ? 'dark' : 'light');
     });
 }
 // ─── Window IPC (registered ONCE, not per window instance) ──────────────────
-// Registering inside createWindow() adds duplicate listeners on macOS when
-// the window is re-created after being closed (via app.on('activate')).
 function setupWindowIpc() {
     electron_1.ipcMain.on('window:minimize', () => mainWindow?.minimize());
     electron_1.ipcMain.on('window:maximize', () => {
@@ -425,22 +485,17 @@ function setupWindowIpc() {
             mainWindow?.maximize();
     });
     electron_1.ipcMain.on('window:close', () => {
-        const settings = (0, store_1.getStore)().get('settings');
-        if (settings.minimizeToTray) {
-            mainWindow?.hide();
-        }
-        else {
-            forceQuit();
-        }
+        mainWindow?.close();
     });
 }
 // ─── App lifecycle ─────────────────────────────────────────────────────────
 electron_1.app.whenReady().then(async () => {
     (0, handlers_1.setupIpcHandlers)(steamClient, exports.idleManager, exports.steamAccountManager);
     setupWindowIpc(); // Register window IPC once at startup
+    setupNativeThemeListener(); // Register once — avoids duplicate listeners on macOS window recreate
     await runSplashFlow(() => {
         const settings = (0, store_1.getStore)().get('settings');
-        const startMinimized = settings.autostart && settings.minimizeToTray;
+        const startMinimized = settings.minimizeToTray;
         createWindow(startMinimized);
         createTray();
         // setupUpdater MUST be called after the splash flow so that
@@ -468,31 +523,28 @@ electron_1.app.whenReady().then(async () => {
                 catch { /* ok */ }
             }, 2000);
         }
-        // Guard against duplicate 'activate' listeners on macOS
-        if (!activateListenerRegistered) {
-            activateListenerRegistered = true;
-            electron_1.app.on('activate', () => {
-                if (electron_1.BrowserWindow.getAllWindows().length === 0)
-                    createWindow();
-            });
-        }
     });
 });
+// Set isQuitting=true before window close events fire so the mainWindow
+// close handler doesn't call e.preventDefault() (minimizeToTray path)
+// or let forceQuit() call app.exit(0) — both of which would prevent
+// autoUpdater.quitAndInstall() from running the installer.
+electron_1.app.on('before-quit', () => { isQuitting = true; });
 electron_1.app.on('window-all-closed', () => {
-    if (process.platform === 'darwin')
-        return;
     const settings = (0, store_1.getStore)().get('settings');
     if (tray && settings.minimizeToTray)
         return;
     forceQuit();
 });
-let isQuitting = false;
 function forceQuit() {
     if (isQuitting)
         return;
     isQuitting = true;
+    // If an update has been downloaded and is about to install, let
+    // autoUpdater.quitAndInstall() handle the exit — don't call app.exit().
+    if ((0, updater_1.willUpdateInstall)())
+        return;
     // Close the main window immediately (isQuitting=true bypasses the hide logic).
-    // If window is already closed/null this is a no-op.
     mainWindow?.close();
     if (trayUpdateInterval) {
         clearInterval(trayUpdateInterval);
@@ -501,7 +553,8 @@ function forceQuit() {
     exports.idleManager.removeAllListeners('changed');
     tray?.destroy();
     tray = null;
-    exports.idleManager.stopAll();
+    // skipRestore=true: don't open steam:// URLs while the app is shutting down
+    exports.idleManager.stopAll({ skipRestore: true });
     exports.steamAccountManager.destroy();
     const timeout = setTimeout(() => electron_1.app.exit(0), 3000);
     steamClient.destroy()
@@ -511,7 +564,3 @@ function forceQuit() {
         electron_1.app.exit(0);
     });
 }
-// before-quit intentionally omitted: forceQuit() is triggered by
-// window-all-closed (native close) or explicitly from the IPC/tray Quit handler.
-// Hooking before-quit would double-invoke forceQuit() and conflicts with
-// autoUpdater.quitAndInstall() which also calls app.quit() internally.

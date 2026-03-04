@@ -70,4 +70,5 @@ exports.DEFAULT_SETTINGS = {
     notificationsEnabled: true,
     notificationSound: true,
     autoInvisibleWhenIdling: true,
+    stopIdleOnGameLaunch: true,
 };

@@ -70,8 +70,18 @@ export function setupIpcHandlers(steam: SteamClient, idle: IdleManager, steamAcc
 
   ipcMain.handle(IPC.SET_SETTINGS, (_e, settings: Partial<AppSettings>) => {
     try {
+      // Only allow known settings keys to prevent arbitrary key injection
+      const ALLOWED_KEYS: Set<string> = new Set([
+        'theme', 'steamApiKey', 'steamId', 'customAppIds', 'showGlobalPercent',
+        'showHiddenAchievements', 'confirmBulkActions', 'minimizeToTray',
+        'autostart', 'autoIdleGames', 'notificationsEnabled', 'notificationSound',
+        'autoInvisibleWhenIdling', 'stopIdleOnGameLaunch', 'steamRefreshToken',
+      ])
+      const filtered = Object.fromEntries(
+        Object.entries(settings).filter(([k]) => ALLOWED_KEYS.has(k))
+      )
       const current = getStore().get('settings')
-      const merged = { ...current, ...settings }
+      const merged = { ...current, ...filtered }
       getStore().set('settings', merged)
       return { success: true }
     } catch (e: any) { return { success: false, error: e.message } }
@@ -157,8 +167,8 @@ export function setupIpcHandlers(steam: SteamClient, idle: IdleManager, steamAcc
     }
   })
 
-  // (legacy inline fetch kept below for reference — no longer reachable)
-  ipcMain.handle('__GET_STEAM_FEATURED_UNUSED__', async () => {
+  // (legacy inline fetch — REMOVED, kept here only as a comment for reference)
+  /* ipcMain.handle('__GET_STEAM_FEATURED_UNUSED__', async () => {
     try {
       const [catRes, featRes] = await Promise.allSettled([
         axios.get('https://store.steampowered.com/api/featuredcategories/?cc=us&l=english', { timeout: 8000 }),
@@ -218,7 +228,7 @@ export function setupIpcHandlers(steam: SteamClient, idle: IdleManager, steamAcc
     } catch (e: any) {
       return { success: false, error: e.message }
     }
-  })
+  }) */
 
   ipcMain.handle(IPC.SEARCH_GAMES, async (_e, term: string) => {
     try {
@@ -307,7 +317,7 @@ export function setupIpcHandlers(steam: SteamClient, idle: IdleManager, steamAcc
     try {
       // Parse steamLoginSecure format: "76561198XXXXXXXXX||<jwt>" (may be URL-encoded)
       const decoded = decodeURIComponent(token.trim())
-      const refreshToken = decoded.includes('||') ? decoded.split('||')[1] : decoded
+      const refreshToken = decoded.includes('||') ? decoded.split('||').pop()! : decoded
 
       await steamAccount.loginWithRefreshToken(refreshToken)
 
@@ -403,13 +413,30 @@ export function setupIpcHandlers(steam: SteamClient, idle: IdleManager, steamAcc
 
   // Download a partner app installer to the user's Downloads folder
   ipcMain.handle(IPC.DOWNLOAD_PARTNER_APP, async (_e, key: string, url: string, fileName: string): Promise<IPCResponse<void>> => {
+    // Security: validate URL is from a trusted GitHub releases domain
+    const ALLOWED_HOSTS = ['github.com', 'objects.githubusercontent.com']
+    try {
+      const parsed = new URL(url)
+      if (!ALLOWED_HOSTS.some(h => parsed.hostname === h || parsed.hostname.endsWith('.' + h))) {
+        return { success: false, error: 'Download URL is not from a trusted source' }
+      }
+    } catch {
+      return { success: false, error: 'Invalid download URL' }
+    }
+
+    // Security: sanitize fileName to prevent path traversal
+    const safeName = path.basename(fileName)
+    if (!safeName || safeName.startsWith('.')) {
+      return { success: false, error: 'Invalid file name' }
+    }
+
     const pushProgress = (p: PartnerAppDownloadProgress) => {
       for (const win of BrowserWindow.getAllWindows()) {
         if (!win.isDestroyed()) win.webContents.send(IPC.PARTNER_APP_DOWNLOAD_PROGRESS, p)
       }
     }
 
-    const destPath = path.join(app.getPath('downloads'), fileName)
+    const destPath = path.join(app.getPath('downloads'), safeName)
 
     try {
       const res = await axios.get(url, {
@@ -445,9 +472,6 @@ export function setupIpcHandlers(steam: SteamClient, idle: IdleManager, steamAcc
       })
 
       pushProgress({ key, percent: 100, done: true, filePath: destPath })
-      // Small grace period to ensure Windows fully releases the handle before launching
-      await new Promise(r => setTimeout(r, 300))
-      await shell.openPath(destPath)
 
       return { success: true }
     } catch (e: any) {

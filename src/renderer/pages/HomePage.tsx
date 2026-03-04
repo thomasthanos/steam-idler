@@ -218,7 +218,24 @@ function formatPlaytime(minutes: number): string {
 // ─── Idling Now Widget ────────────────────────────────────────────────────
 function IdlingNowWidget({ games }: { games: { appId: number; name: string }[] }) {
   const [now, setNow] = useState(Date.now())
-  const [since] = useState(() => Date.now())
+  // Track per-game start time so each game shows its own elapsed time
+  const [startTimes, setStartTimes] = useState<Record<number, number>>({})
+
+  // Register start time for each new game
+  useEffect(() => {
+    setStartTimes(prev => {
+      const updated = { ...prev }
+      const ts = Date.now()
+      for (const g of games) {
+        if (!(g.appId in updated)) updated[g.appId] = ts
+      }
+      // Remove games no longer idling
+      for (const key of Object.keys(updated)) {
+        if (!games.some(g => g.appId === Number(key))) delete updated[Number(key)]
+      }
+      return updated
+    })
+  }, [games])
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000)
@@ -266,7 +283,7 @@ function IdlingNowWidget({ games }: { games: { appId: number; name: string }[] }
             <div className="flex items-center gap-1.5 shrink-0">
               <Clock className="w-3 h-3" style={{ color: 'var(--muted)' }} />
               <span className="text-xs tabular-nums font-semibold" style={{ color: 'var(--green)' }}>
-                {elapsed(since)}
+                {elapsed(startTimes[g.appId] ?? now)}
               </span>
             </div>
           </div>

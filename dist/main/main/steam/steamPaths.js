@@ -4,10 +4,9 @@
  * Finds the Steam installation directory and reads local Steam data files.
  *
  * HOW SAM ACTUALLY WORKS (no Steam Web API key needed):
- *  1. Find Steam install path → Windows registry or known Linux/macOS paths
+ *  1. Find Steam install path → Windows registry, then common install paths
  *  2. Read game list → steamapps/*.acf manifest files (+ extra library folders)
- *  3. Read achievement schema → appcache/stats/UserGameStatsSchema_{appid}.bin (binary VDF)
- *     OR the free Steam Web API endpoint as fallback
+ *  3. Read achievement schema → free Steam Web API endpoint
  *  4. Achievement state & modification → steamworks.js (per-game process)
  */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
@@ -51,56 +50,42 @@ exports.readLoginUsers = readLoginUsers;
 exports.parseTextVdf = parseTextVdf;
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
-const os = __importStar(require("os"));
 const child_process_1 = require("child_process");
 // ─── Steam path detection ─────────────────────────────────────────────────────
+let _cachedSteamPath = null;
 function getSteamPath() {
-    const platform = process.platform;
-    if (platform === 'win32') {
-        // Try registry (64-bit and 32-bit views)
-        const regKeys = [
-            'HKCU\\Software\\Valve\\Steam',
-            'HKLM\\SOFTWARE\\Valve\\Steam',
-            'HKLM\\SOFTWARE\\Wow6432Node\\Valve\\Steam',
-        ];
-        for (const key of regKeys) {
-            try {
-                const result = (0, child_process_1.execSync)(`reg query "${key}" /v SteamPath 2>nul`, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] });
-                const match = result.match(/SteamPath\s+REG_SZ\s+(.+)/i);
-                if (match) {
-                    const p = match[1].trim().replace(/\//g, '\\');
-                    if (fs.existsSync(p))
-                        return p;
+    if (_cachedSteamPath)
+        return _cachedSteamPath;
+    // Try registry (64-bit and 32-bit views)
+    const regKeys = [
+        'HKCU\\Software\\Valve\\Steam',
+        'HKLM\\SOFTWARE\\Valve\\Steam',
+        'HKLM\\SOFTWARE\\Wow6432Node\\Valve\\Steam',
+    ];
+    for (const key of regKeys) {
+        try {
+            const result = (0, child_process_1.execSync)(`reg query "${key}" /v SteamPath 2>nul`, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] });
+            const match = result.match(/SteamPath\s+REG_SZ\s+(.+)/i);
+            if (match) {
+                const p = match[1].trim().replace(/\//g, '\\');
+                if (fs.existsSync(p)) {
+                    _cachedSteamPath = p;
+                    return p;
                 }
             }
-            catch { /* try next */ }
         }
-        // Fallback: common Windows paths
-        const fallbacks = [
-            'C:\\Program Files (x86)\\Steam',
-            'C:\\Program Files\\Steam',
-        ];
-        for (const p of fallbacks) {
-            if (fs.existsSync(p))
-                return p;
-        }
+        catch { /* try next */ }
     }
-    if (platform === 'linux') {
-        const candidates = [
-            path.join(os.homedir(), '.steam', 'steam'),
-            path.join(os.homedir(), '.steam', 'root'),
-            path.join(os.homedir(), '.local', 'share', 'Steam'),
-            '/usr/share/steam',
-        ];
-        for (const p of candidates) {
-            if (fs.existsSync(p))
-                return p;
-        }
-    }
-    if (platform === 'darwin') {
-        const p = path.join(os.homedir(), 'Library', 'Application Support', 'Steam');
-        if (fs.existsSync(p))
+    // Fallback: common Windows installation paths
+    const fallbacks = [
+        'C:\\Program Files (x86)\\Steam',
+        'C:\\Program Files\\Steam',
+    ];
+    for (const p of fallbacks) {
+        if (fs.existsSync(p)) {
+            _cachedSteamPath = p;
             return p;
+        }
     }
     throw new Error('Steam installation not found. Please make sure Steam is installed.');
 }
@@ -297,7 +282,7 @@ function tokenize(text) {
         }
         // Unquoted token (until whitespace or brace)
         let token = '';
-        while (i < text.length && !/[\s{}"]/g.test(text[i])) {
+        while (i < text.length && !/[\s{}"]/.test(text[i])) {
             token += text[i++];
         }
         if (token)

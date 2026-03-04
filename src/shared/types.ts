@@ -163,6 +163,7 @@ export interface AppSettings {
   // Steam Account (auto-invisible when idling)
   steamRefreshToken?: string  // base64-obfuscated refresh token
   autoInvisibleWhenIdling: boolean
+  stopIdleOnGameLaunch: boolean
 }
 
 // ─── Steam Account Status ─────────────────────────────────────────────────────
@@ -209,4 +210,5 @@ export const DEFAULT_SETTINGS: AppSettings = {
   notificationsEnabled: true,
   notificationSound: true,
   autoInvisibleWhenIdling: true,
+  stopIdleOnGameLaunch: true,
 }

@@ -15,6 +15,13 @@ import { BrowserWindow, ipcMain } from 'electron'
 import { autoUpdater, UpdateInfo, ProgressInfo } from 'electron-updater'
 import { IPC, UpdaterState } from '../shared/types'
 
+// ─── Update-will-install flag ────────────────────────────────────────────────
+// Tracks whether an update has been downloaded and is about to install.
+// Exported as a getter so index.ts can check it without a circular import.
+let _updateWillInstall = false
+export function setUpdateWillInstall(): void { _updateWillInstall = true }
+export function willUpdateInstall(): boolean { return _updateWillInstall }
+
 // ─── Configure ────────────────────────────────────────────────────────────────
 // autoDownload = false globally: we call downloadUpdate() manually so we can
 // show progress. The splash flow downloads on startup; the background check
@@ -126,6 +133,7 @@ export function performStartupUpdateCheck(
 
     const onDownloaded = (info: UpdateInfo) => {
       willInstall = true
+      setUpdateWillInstall()
       onEvent({ type: 'status',   text: `v${info.version} ready — restarting…`, cls: 'success' })
       onEvent({ type: 'progress', percent: 100 })
       cleanup()
@@ -195,11 +203,14 @@ export function setupUpdater(): void {
     broadcast({ status: 'downloading', percent: Math.round(p.percent), version })
   })
 
+  let quitAndInstallScheduled = false
   autoUpdater.on('update-downloaded', (info: UpdateInfo) => {
+    setUpdateWillInstall()
     broadcast({ status: 'downloaded', version: info.version })
-    // Fully automatic — restart & install after a 3-second grace period
-    // so the user can see the "restarting" message before the app closes.
-    setTimeout(() => autoUpdater.quitAndInstall(true, true), 3000)
+    if (!quitAndInstallScheduled) {
+      quitAndInstallScheduled = true
+      setTimeout(() => autoUpdater.quitAndInstall(true, true), 3000)
+    }
   })
 
   autoUpdater.on('error', (err: Error) => {
@@ -219,6 +230,9 @@ export function setupUpdater(): void {
   })
 
   ipcMain.handle(IPC.UPDATER_RESTART, () => {
-    autoUpdater.quitAndInstall(true, true)
+    if (!quitAndInstallScheduled) {
+      quitAndInstallScheduled = true
+      autoUpdater.quitAndInstall(true, true)
+    }
   })
 }

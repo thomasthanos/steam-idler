@@ -3,7 +3,7 @@ import { Home, Gamepad2, Settings, User, ChevronRight, Sparkles } from 'lucide-r
 import { useAppContext } from '../hooks/useAppContext'
 import GameImage from './GameImage'
 import clsx from 'clsx'
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 
 // ── Custom SVG icons ────────────────────────────────────────────────────────
 
@@ -38,6 +38,71 @@ const navItems = [
   { to: '/games', icon: Gamepad2, label: 'Achievements' },
 ]
 
+// ── NavItem (defined OUTSIDE of Sidebar to prevent unmount/remount on every render) ──
+
+function NavItem({ to, icon: Icon, svgIcon, label, badge }: {
+  to: string
+  icon?: React.ElementType
+  svgIcon?: (color: string) => React.ReactNode
+  label: string
+  badge?: React.ReactNode
+}) {
+  return (
+    <NavLink
+      to={to}
+      className={({ isActive }) =>
+        clsx('nav-active-glow group flex items-center gap-3 px-3 py-2 rounded-xl transition-all duration-200 cursor-pointer', isActive ? 'active' : '')
+      }
+      style={({ isActive }) => isActive
+        ? { background: 'rgba(59,130,246,0.1)', color: 'var(--accent)', border: '1px solid rgba(59,130,246,0.2)' }
+        : { color: 'var(--sub)', border: '1px solid transparent' }
+      }
+      onMouseEnter={e => {
+        const el = e.currentTarget
+        if (!el.classList.contains('active')) {
+          el.style.background = 'rgba(255,255,255,0.04)'
+          el.style.borderColor = 'rgba(255,255,255,0.07)'
+          el.style.transform = 'translateX(2px)'
+        }
+      }}
+      onMouseLeave={e => {
+        const el = e.currentTarget
+        if (!el.classList.contains('active')) {
+          el.style.background = 'transparent'
+          el.style.borderColor = 'transparent'
+          el.style.transform = 'translateX(0)'
+        }
+      }}
+    >
+      {({ isActive }) => {
+        const color = isActive ? 'var(--accent)' : 'var(--sub)'
+        return (
+          <>
+            <span className="shrink-0 transition-all duration-200 group-hover:scale-110">
+              {svgIcon ? svgIcon(color) : Icon && <Icon className="w-4 h-4" style={{ color }} />}
+            </span>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium leading-tight">{label}</p>
+            </div>
+            {badge}
+          </>
+        )
+      }}
+    </NavLink>
+  )
+}
+
+function SectionLabel({ label, right }: { label: string; right?: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-between px-3 pt-1 pb-2">
+      <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--muted)', letterSpacing: '0.1em' }}>
+        {label}
+      </p>
+      {right}
+    </div>
+  )
+}
+
 // ── Component ───────────────────────────────────────────────────────────────
 
 export default function Sidebar() {
@@ -55,70 +120,6 @@ export default function Sidebar() {
     const t = setInterval(refresh, 5000)
     return () => clearInterval(t)
   }, [])
-
-  // ── Nav link ──────────────────────────────────────────────────────────────
-  function NavItem({ to, icon: Icon, svgIcon, label, badge }: {
-    to: string
-    icon?: React.ElementType
-    svgIcon?: (color: string) => React.ReactNode
-    label: string
-    badge?: React.ReactNode
-  }) {
-    return (
-      <NavLink
-        to={to}
-        className={({ isActive }) =>
-          clsx('nav-active-glow group flex items-center gap-3 px-3 py-2 rounded-xl transition-all duration-200 cursor-pointer', isActive ? 'active' : '')
-        }
-        style={({ isActive }) => isActive
-          ? { background: 'rgba(59,130,246,0.1)', color: 'var(--accent)', border: '1px solid rgba(59,130,246,0.2)' }
-          : { color: 'var(--sub)', border: '1px solid transparent' }
-        }
-        onMouseEnter={e => {
-          const el = e.currentTarget
-          if (!el.classList.contains('active')) {
-            el.style.background = 'rgba(255,255,255,0.04)'
-            el.style.borderColor = 'rgba(255,255,255,0.07)'
-            el.style.transform = 'translateX(2px)'
-          }
-        }}
-        onMouseLeave={e => {
-          const el = e.currentTarget
-          if (!el.classList.contains('active')) {
-            el.style.background = 'transparent'
-            el.style.borderColor = 'transparent'
-            el.style.transform = 'translateX(0)'
-          }
-        }}
-      >
-        {({ isActive }) => {
-          const color = isActive ? 'var(--accent)' : 'var(--sub)'
-          return (
-            <>
-              <span className="shrink-0 transition-all duration-200 group-hover:scale-110">
-                {svgIcon ? svgIcon(color) : Icon && <Icon className="w-4 h-4" style={{ color }} />}
-              </span>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium leading-tight">{label}</p>
-              </div>
-              {badge}
-            </>
-          )
-        }}
-      </NavLink>
-    )
-  }
-
-  function SectionLabel({ label, right }: { label: string; right?: React.ReactNode }) {
-    return (
-      <div className="flex items-center justify-between px-3 pt-1 pb-2">
-        <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--muted)', letterSpacing: '0.1em' }}>
-          {label}
-        </p>
-        {right}
-      </div>
-    )
-  }
 
   return (
     <aside className="w-48 flex flex-col shrink-0 select-none" style={{ background: 'var(--surface)', borderRight: '1px solid var(--border)' }}>

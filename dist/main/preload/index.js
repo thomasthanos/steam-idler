@@ -28,6 +28,11 @@ const steamAPI = {
         electron_1.ipcRenderer.on('idle:changed', cb);
         return () => electron_1.ipcRenderer.removeListener('idle:changed', cb);
     },
+    onIdleWarning: (cb) => {
+        const handler = (_, data) => cb(data);
+        electron_1.ipcRenderer.on('idle:warning', handler);
+        return () => { electron_1.ipcRenderer.removeListener('idle:warning', handler); };
+    },
     // Steam Store
     getSteamFeatured: () => electron_1.ipcRenderer.invoke(types_1.IPC.GET_STEAM_FEATURED),
     resolveAppName: (appId) => electron_1.ipcRenderer.invoke(types_1.IPC.RESOLVE_APP_NAME, appId),

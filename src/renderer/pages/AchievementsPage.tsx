@@ -168,12 +168,14 @@ export default function AchievementsPage() {
       stopTimerRef.current = null
     }
     return () => {
+      const appIdToStop = numAppId
       stopTimerRef.current = setTimeout(() => {
         stopTimerRef.current = null
-        window.steam.stopGame(numAppId).catch(() => {})
+        window.steam.stopGame(appIdToStop).catch(() => {})
       }, 2000)
     }
-  }, [])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [numAppId])
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {

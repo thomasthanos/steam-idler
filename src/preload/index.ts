@@ -58,6 +58,12 @@ const steamAPI = {
     return () => ipcRenderer.removeListener('idle:changed', cb)
   },
 
+  onIdleWarning: (cb: (data: { type: string; appId: number }) => void) => {
+    const handler = (_: unknown, data: { type: string; appId: number }) => cb(data)
+    ipcRenderer.on('idle:warning', handler)
+    return () => { ipcRenderer.removeListener('idle:warning', handler) }
+  },
+
   // Steam Store
   getSteamFeatured: (): Promise<IPCResponse<{ deals: any[]; featured: any[]; freeGames: any[] }>> =>
     ipcRenderer.invoke(IPC.GET_STEAM_FEATURED),

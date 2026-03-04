@@ -12,12 +12,20 @@
  *   "publish": { "provider": "github", "owner": "ThomasThanos", "repo": "steam-idler" }
  */
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.setUpdateWillInstall = setUpdateWillInstall;
+exports.willUpdateInstall = willUpdateInstall;
 exports.performStartupUpdateCheck = performStartupUpdateCheck;
 exports.triggerBackgroundCheck = triggerBackgroundCheck;
 exports.setupUpdater = setupUpdater;
 const electron_1 = require("electron");
 const electron_updater_1 = require("electron-updater");
 const types_1 = require("../shared/types");
+// ─── Update-will-install flag ────────────────────────────────────────────────
+// Tracks whether an update has been downloaded and is about to install.
+// Exported as a getter so index.ts can check it without a circular import.
+let _updateWillInstall = false;
+function setUpdateWillInstall() { _updateWillInstall = true; }
+function willUpdateInstall() { return _updateWillInstall; }
 // ─── Configure ────────────────────────────────────────────────────────────────
 // autoDownload = false globally: we call downloadUpdate() manually so we can
 // show progress. The splash flow downloads on startup; the background check
@@ -94,6 +102,13 @@ function performStartupUpdateCheck(onEvent, preload) {
         }
         // ── Update check event handlers ──────────────────────────────────
         const onAvailable = (info) => {
+            // Cancel safety timer: we now wait for download to complete (or fail).
+            // Without this, a slow download would let the 12 s timer fire and open
+            // the main window while the update is still being downloaded/installed.
+            if (safetyTimer) {
+                clearTimeout(safetyTimer);
+                safetyTimer = null;
+            }
             onEvent({ type: 'status', text: `Update v${info.version} found — downloading…` });
             electron_updater_1.autoUpdater.downloadUpdate().catch((err) => onError(err));
             // updateDone intentionally NOT set — we wait for onDownloaded or error
@@ -110,6 +125,7 @@ function performStartupUpdateCheck(onEvent, preload) {
         };
         const onDownloaded = (info) => {
             willInstall = true;
+            setUpdateWillInstall();
             onEvent({ type: 'status', text: `v${info.version} ready — restarting…`, cls: 'success' });
             onEvent({ type: 'progress', percent: 100 });
             cleanup();
@@ -168,11 +184,14 @@ function setupUpdater() {
         const version = electron_updater_1.autoUpdater.updateInfo?.version ?? '…';
         broadcast({ status: 'downloading', percent: Math.round(p.percent), version });
     });
+    let quitAndInstallScheduled = false;
     electron_updater_1.autoUpdater.on('update-downloaded', (info) => {
+        setUpdateWillInstall();
         broadcast({ status: 'downloaded', version: info.version });
-        // Fully automatic — restart & install after a 3-second grace period
-        // so the user can see the "restarting" message before the app closes.
-        setTimeout(() => electron_updater_1.autoUpdater.quitAndInstall(true, true), 3000);
+        if (!quitAndInstallScheduled) {
+            quitAndInstallScheduled = true;
+            setTimeout(() => electron_updater_1.autoUpdater.quitAndInstall(true, true), 3000);
+        }
     });
     electron_updater_1.autoUpdater.on('error', (err) => {
         broadcast({ status: 'error', message: cleanErrorMessage(err) });
@@ -193,6 +212,9 @@ function setupUpdater() {
         return { success: true };
     });
     electron_1.ipcMain.handle(types_1.IPC.UPDATER_RESTART, () => {
-        electron_updater_1.autoUpdater.quitAndInstall(true, true);
+        if (!quitAndInstallScheduled) {
+            quitAndInstallScheduled = true;
+            electron_updater_1.autoUpdater.quitAndInstall(true, true);
+        }
     });
 }

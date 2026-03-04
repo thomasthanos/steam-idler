@@ -18,20 +18,30 @@ export default function IdlePage() {
   const [loading, setLoading] = useState<Record<number, boolean>>({})
   const [now, setNow] = useState(Date.now())
 
-  // Fetch current idle status on mount
+  // Fetch current idle status on mount + listen for external changes
+  // (tray stop-all, manual game launch detection, worker crashes, etc.)
   useEffect(() => {
-    window.steam.getIdleStatus().then(res => {
-      if (res.success && res.data) {
-        setIdlingIds(res.data)
-        const ts = Date.now()
-        const map: Record<number, number> = {}
-        for (const id of res.data) map[id] = ts
-        setIdlingSince(map)
-      }
-    })
+    const refresh = () => {
+      window.steam.getIdleStatus().then(res => {
+        if (res.success && res.data) {
+          // Preserve existing timestamps for games still running
+          setIdlingSince(old => {
+            const next: Record<number, number> = {}
+            const ts = Date.now()
+            for (const id of res.data!) {
+              next[id] = old[id] ?? ts
+            }
+            return next
+          })
+          setIdlingIds(res.data!)
+        }
+      })
+    }
+    refresh()
+    const cleanupIdleChanged = window.steam.onIdleChanged(refresh)
     // Fix #2 – cleanup the interval on unmount
     const t = setInterval(() => setNow(Date.now()), 1000)
-    return () => clearInterval(t)
+    return () => { clearInterval(t); cleanupIdleChanged() }
   }, [])
 
   const filteredGames = games.filter(g =>

@@ -43,6 +43,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const saveTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null)
   // Accumulates partial updates that haven't been flushed yet.
   const pendingSaveRef = useRef<Partial<AppSettings>>({})
+  // Snapshot of settings BEFORE the first optimistic update in the current batch.
+  // Used to roll back ALL keys in the batch if the server call fails.
+  const preOptimisticRef = useRef<Partial<AppSettings> | null>(null)
 
   const refreshUser = useCallback(async () => {
     setIsLoadingUser(true)
@@ -78,19 +81,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [gamesFetched])
 
+  // Accumulates pending resolve/reject callbacks so rapid callers all settle.
+  const pendingCallbacksRef = useRef<Array<{ resolve: () => void; reject: (e: Error) => void }>>([])
+
   const updateSettings = useCallback(async (partial: Partial<AppSettings>) => {
-    // --- Capture pre-update values for rollback BEFORE optimistic update ---
-    const prevValues: Partial<AppSettings> = {}
-    for (const k of Object.keys(partial) as (keyof AppSettings)[]) {
-      // Read current settings directly from the ref-stable setter closure
-      // by temporarily capturing via a state read trick — instead, we store
-      // them into the pending rollback ref before the optimistic setState.
-      ;(prevValues as Record<string, unknown>)[k] = undefined // placeholder, filled below
-    }
+    // --- Capture the pre-batch snapshot on the FIRST call in a new batch ---
     setSettings(prev => {
-      // Capture actual previous values here where prev is guaranteed correct
-      for (const k of Object.keys(partial) as (keyof AppSettings)[]) {
-        ;(prevValues as Record<string, unknown>)[k] = prev[k]
+      if (preOptimisticRef.current === null) {
+        const snap: Partial<AppSettings> = {}
+        for (const k of Object.keys(partial) as (keyof AppSettings)[]) {
+          ;(snap as Record<string, unknown>)[k] = prev[k]
+        }
+        preOptimisticRef.current = snap
+      } else {
+        for (const k of Object.keys(partial) as (keyof AppSettings)[]) {
+          if (!(k in preOptimisticRef.current!)) {
+            ;(preOptimisticRef.current as Record<string, unknown>)[k] = prev[k]
+          }
+        }
       }
       return { ...prev, ...partial }
     })
@@ -103,17 +111,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (saveTimerRef.current !== null) clearTimeout(saveTimerRef.current)
 
     await new Promise<void>((resolve, reject) => {
+      pendingCallbacksRef.current.push({ resolve, reject })
+
       saveTimerRef.current = setTimeout(async () => {
         saveTimerRef.current = null
         const batch = pendingSaveRef.current
+        const snapshot = preOptimisticRef.current
+        const callbacks = pendingCallbacksRef.current
         pendingSaveRef.current = {}
+        preOptimisticRef.current = null
+        pendingCallbacksRef.current = []
 
         try {
           const res = await window.steam.setSettings(batch)
           if (!res.success) {
-            // Roll back using the pre-optimistic values captured above
-            setSettings(prev => ({ ...prev, ...prevValues }))
-            reject(new Error(res.error ?? 'Failed to save settings'))
+            if (snapshot) setSettings(prev => ({ ...prev, ...snapshot }))
+            const err = new Error(res.error ?? 'Failed to save settings')
+            for (const cb of callbacks) cb.reject(err)
             return
           }
 
@@ -128,12 +142,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
               .finally(() => setIsLoadingGames(false))
           }
 
-          resolve()
+          for (const cb of callbacks) cb.resolve()
         } catch (e) {
-          reject(e)
+          for (const cb of callbacks) cb.reject(e as Error)
         }
-      }, 150)  // 150 ms debounce window
+      }, 150)
     })
+  }, [])
+
+  // Cleanup debounce timer on unmount (prevents state updates after unmount)
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+    }
   }, [])
 
   useEffect(() => {

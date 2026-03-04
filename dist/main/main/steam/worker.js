@@ -15595,6 +15595,7 @@ process.stdin.on("data", (chunk) => {
   }
 });
 process.stdin.on("end", () => process.exit(0));
+process.stdin.on("error", () => process.exit(1));
 function handleIdle(id) {
   if (!client) {
     send(id, false, void 0, "Not initialised");

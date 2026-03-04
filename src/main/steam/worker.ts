@@ -346,6 +346,8 @@ process.stdin.on('data', (chunk: string) => {
   }
 })
 process.stdin.on('end', () => process.exit(0))
+// Handle stdin errors (e.g. parent crash on Windows leaves pipe broken)
+process.stdin.on('error', () => process.exit(1))
 
 // ─── Idle handler ────────────────────────────────────────────────────────────
 // No separate idle interval needed — startCallbackLoop() at INIT (250 ms)

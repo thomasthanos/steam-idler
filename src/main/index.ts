@@ -1,9 +1,9 @@
-import { app, BrowserWindow, ipcMain, nativeTheme, shell, Tray, Menu, nativeImage } from 'electron'
+import { app, BrowserWindow, ipcMain, nativeTheme, shell, Tray, Menu, nativeImage, Notification } from 'electron'
 import { TRAY_ICONS } from './trayIcons'
 import * as path from 'path'
 import * as fs from 'fs'
 import { setupIpcHandlers } from './ipc/handlers'
-import { performStartupUpdateCheck, setupUpdater, triggerBackgroundCheck, SplashEvent, PreloadFn } from './updater'
+import { performStartupUpdateCheck, setupUpdater, triggerBackgroundCheck, willUpdateInstall, SplashEvent, PreloadFn } from './updater'
 import { SteamClient } from './steam/client'
 import { IdleManager } from './steam/idleManager'
 import { SteamAccountManager } from './steam/steamUser'
@@ -19,7 +19,7 @@ app.setPath('userData', path.join(app.getPath('appData'), 'ThomasThanos', 'Souvl
 let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
 let trayUpdateInterval: ReturnType<typeof setInterval> | null = null
-let activateListenerRegistered = false
+let isQuitting = false
 const steamClient = new SteamClient()
 export const idleManager = new IdleManager()
 export const steamAccountManager = new SteamAccountManager()
@@ -27,10 +27,63 @@ idleManager.setSteamAccountManager(steamAccountManager)
 
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged
 
+// ─── Idle notification helper ─────────────────────────────────────────────
+function showIdleNotification(title: string, body: string): void {
+  try {
+    if (!Notification.isSupported()) return
+    const iconCandidates = [
+      path.join(process.resourcesPath ?? '', 'notify.png'),
+      path.join(__dirname, '../../../resources/notify.png'),
+      path.join(app.getAppPath(), 'resources/notify.png'),
+      path.join(__dirname, '../../../resources/steam.png'),
+    ]
+    const icon = iconCandidates.find(p => { try { return fs.existsSync(p) } catch { return false } })
+    const n = new Notification({ title, body, silent: false, icon })
+    n.on('click', () => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.show()
+        mainWindow.focus()
+      }
+    })
+    n.show()
+  } catch (e) {
+    console.error('[notification] Failed:', e)
+  }
+}
+
+// Notify when a manual game launch stops all idling
+idleManager.on('manual-game-detected', (appId: number) => {
+  showIdleNotification(
+    'Idling Stopped',
+    `A Steam game was launched (AppID: ${appId}). All idling has been stopped and your status has been restored.`,
+  )
+  // Also send in-app notification (toast) for when OS notifications are disabled
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('idle:warning', { type: 'manual-game-detected', appId })
+  }
+})
+
+// Notify when starting idle while a game is already running
+idleManager.on('game-already-running', (appId: number) => {
+  showIdleNotification(
+    'Game Already Running',
+    `A Steam game is currently running (AppID: ${appId}). Idling will start, but it may conflict with the running game.`,
+  )
+  // Also send in-app notification (toast) for when OS notifications are disabled
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('idle:warning', { type: 'game-already-running', appId })
+  }
+})
+
 // ─── Production logging ───────────────────────────────────────────────────────
 if (!isDev) {
   const logFile = path.join(app.getPath('userData'), 'debug.log')
   try {
+    // Truncate log file if over 5 MB to prevent unbounded growth
+    try {
+      const stat = fs.statSync(logFile)
+      if (stat.size > 5 * 1024 * 1024) fs.writeFileSync(logFile, '')
+    } catch { /* file may not exist yet */ }
     const logStream = fs.createWriteStream(logFile, { flags: 'a' })
     const originalLog = console.log
     const originalError = console.error
@@ -58,9 +111,9 @@ if (!gotLock) {
   app.quit()
 } else {
   app.on('second-instance', () => {
-    if (mainWindow) {
+    if (mainWindow && !mainWindow.isDestroyed()) {
       if (mainWindow.isMinimized()) mainWindow.restore()
-      mainWindow.show()
+      if (!mainWindow.isVisible()) mainWindow.show()
       mainWindow.focus()
     }
   })
@@ -125,7 +178,9 @@ async function runSplashFlow(onReady: () => void): Promise<void> {
     },
   })
 
-  splash.loadFile(getSplashHtmlPath())
+  splash.loadFile(getSplashHtmlPath()).catch((err: Error) => {
+    console.error('[splash] Failed to load splash HTML:', err)
+  })
 
   // Wait for the splash to be ready before starting work so early status
   // messages (e.g. "Connecting to Steam…") are not lost.
@@ -249,7 +304,7 @@ function createTray(): void {
       } catch { return undefined }
     }
 
-    const appIcon = icon.isEmpty() ? undefined : nativeImage.createFromPath(getIconPath('32')).resize({ width: 16, height: 16 })
+    const appIcon = icon.isEmpty() ? undefined : icon.resize({ width: 16, height: 16 })
 
     const updateMenu = () => {
       const idlingGames = idleManager.getIdlingGames()
@@ -273,8 +328,7 @@ function createTray(): void {
               icon: menuIcon('tray_stop'),
               click: () => {
                 idleManager.stopAll()
-                mainWindow?.webContents.send('idle:changed')
-                updateMenu()
+                // updateMenu + idle:changed broadcast handled by 'changed' event listener
               },
             },
           ]
@@ -305,9 +359,14 @@ function createTray(): void {
       else { mainWindow?.show(); mainWindow?.focus() }
     })
 
-    // Fix #10 – update the tray immediately whenever idle state changes
-    // (e.g. a game starts or stops), without waiting for the polling interval.
-    idleManager.on('changed', updateMenu)
+    // Fix #10 – update the tray AND renderer immediately whenever idle
+    // state changes (e.g. a game starts, stops, or a worker exits).
+    idleManager.on('changed', () => {
+      updateMenu()
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('idle:changed')
+      }
+    })
 
     // Keep a slower poll as a safety net (handles edge-cases like process crashes
     // where the 'exit' event may arrive after a delay).
@@ -383,6 +442,9 @@ function createWindow(startMinimized = false): void {
 
   mainWindow.on('closed', () => { mainWindow = null })
 
+}
+
+function setupNativeThemeListener(): void {
   nativeTheme.on('updated', () => {
     mainWindow?.webContents.send(
       'theme:changed',
@@ -392,8 +454,6 @@ function createWindow(startMinimized = false): void {
 }
 
 // ─── Window IPC (registered ONCE, not per window instance) ──────────────────
-// Registering inside createWindow() adds duplicate listeners on macOS when
-// the window is re-created after being closed (via app.on('activate')).
 function setupWindowIpc(): void {
   ipcMain.on('window:minimize', () => mainWindow?.minimize())
   ipcMain.on('window:maximize', () => {
@@ -401,23 +461,19 @@ function setupWindowIpc(): void {
     else mainWindow?.maximize()
   })
   ipcMain.on('window:close', () => {
-    const settings = getStore().get('settings')
-    if (settings.minimizeToTray) {
-      mainWindow?.hide()
-    } else {
-      forceQuit()
-    }
+    mainWindow?.close()
   })
 }
 
 // ─── App lifecycle ─────────────────────────────────────────────────────────
 app.whenReady().then(async () => {
   setupIpcHandlers(steamClient, idleManager, steamAccountManager)
-  setupWindowIpc()  // Register window IPC once at startup
+  setupWindowIpc()        // Register window IPC once at startup
+  setupNativeThemeListener() // Register once — avoids duplicate listeners on macOS window recreate
 
   await runSplashFlow(() => {
     const settings = getStore().get('settings')
-    const startMinimized = settings.autostart && settings.minimizeToTray
+    const startMinimized = settings.minimizeToTray
     createWindow(startMinimized)
     createTray()
     // setupUpdater MUST be called after the splash flow so that
@@ -446,13 +502,6 @@ app.whenReady().then(async () => {
       }, 2000)
     }
 
-    // Guard against duplicate 'activate' listeners on macOS
-    if (!activateListenerRegistered) {
-      activateListenerRegistered = true
-      app.on('activate', () => {
-        if (BrowserWindow.getAllWindows().length === 0) createWindow()
-      })
-    }
   })
 })
 
@@ -463,25 +512,27 @@ app.whenReady().then(async () => {
 app.on('before-quit', () => { isQuitting = true })
 
 app.on('window-all-closed', () => {
-  if (process.platform === 'darwin') return
   const settings = getStore().get('settings')
   if (tray && settings.minimizeToTray) return
   forceQuit()
 })
 
-let isQuitting = false
-
 export function forceQuit() {
   if (isQuitting) return
   isQuitting = true
+
+  // If an update has been downloaded and is about to install, let
+  // autoUpdater.quitAndInstall() handle the exit — don't call app.exit().
+  if (willUpdateInstall()) return
+
   // Close the main window immediately (isQuitting=true bypasses the hide logic).
-  // If window is already closed/null this is a no-op.
   mainWindow?.close()
   if (trayUpdateInterval) { clearInterval(trayUpdateInterval); trayUpdateInterval = null }
   idleManager.removeAllListeners('changed')
   tray?.destroy()
   tray = null
-  idleManager.stopAll()
+  // skipRestore=true: don't open steam:// URLs while the app is shutting down
+  idleManager.stopAll({ skipRestore: true })
   steamAccountManager.destroy()
   const timeout = setTimeout(() => app.exit(0), 3000)
   steamClient.destroy()

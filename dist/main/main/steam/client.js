@@ -278,7 +278,10 @@ class WorkerBridge {
         }
         catch { /* ok */ }
         await new Promise((r) => {
-            const t = setTimeout(() => { proc.kill(); r(); }, 3000);
+            const t = setTimeout(() => { try {
+                proc.kill('SIGKILL');
+            }
+            catch { /* ok */ } ; r(); }, 3000);
             proc.once('exit', () => { clearTimeout(t); r(); });
         });
     }
@@ -304,28 +307,20 @@ async function fetchStoreName(appId) {
     catch { /* network/timeout */ }
     return null;
 }
-/** Check if Steam is running via OS process list (avoids steamworks init / Spacewar) */
+/** Check if Steam is running via Windows process list (avoids steamworks init / Spacewar) */
 function detectSteamProcess() {
-    try {
-        if (process.platform === 'win32') {
-            const out = (0, child_process_1.execSync)('tasklist /FI "IMAGENAME eq steam.exe" /NH', {
-                timeout: 3000,
-                windowsHide: true,
-            }).toString();
-            return out.toLowerCase().includes('steam.exe');
-        }
-        else if (process.platform === 'darwin') {
-            const out = (0, child_process_1.execSync)('pgrep -x steam || pgrep -x Steam', { timeout: 3000 }).toString();
-            return out.trim().length > 0;
-        }
-        else {
-            const out = (0, child_process_1.execSync)('pgrep -x steam', { timeout: 3000 }).toString();
-            return out.trim().length > 0;
-        }
-    }
-    catch {
-        return false;
-    }
+    return new Promise((resolve) => {
+        (0, child_process_1.execFile)('tasklist', ['/FI', 'IMAGENAME eq steam.exe', '/NH'], {
+            timeout: 3000,
+            windowsHide: true,
+        }, (err, stdout) => {
+            if (err) {
+                resolve(false);
+                return;
+            }
+            resolve(stdout.toLowerCase().includes('steam.exe'));
+        });
+    });
 }
 // ─── SteamClient (main-process API) ────────────────────────────────────────
 class SteamClient {
@@ -337,7 +332,7 @@ class SteamClient {
     // ── Steam Running ─────────────────────────────────────────────────────────
     // Uses process detection instead of sw.init(480) to avoid "Spacewar" appearing.
     async isSteamRunning() {
-        return detectSteamProcess();
+        return await detectSteamProcess();
     }
     // ── User Info ─────────────────────────────────────────────────────────────
     async getUserInfo() {

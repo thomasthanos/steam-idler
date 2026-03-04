@@ -74,8 +74,16 @@ function setupIpcHandlers(steam, idle, steamAccount) {
     });
     electron_1.ipcMain.handle(types_1.IPC.SET_SETTINGS, (_e, settings) => {
         try {
+            // Only allow known settings keys to prevent arbitrary key injection
+            const ALLOWED_KEYS = new Set([
+                'theme', 'steamApiKey', 'steamId', 'customAppIds', 'showGlobalPercent',
+                'showHiddenAchievements', 'confirmBulkActions', 'minimizeToTray',
+                'autostart', 'autoIdleGames', 'notificationsEnabled', 'notificationSound',
+                'autoInvisibleWhenIdling', 'stopIdleOnGameLaunch', 'steamRefreshToken',
+            ]);
+            const filtered = Object.fromEntries(Object.entries(settings).filter(([k]) => ALLOWED_KEYS.has(k)));
             const current = (0, store_1.getStore)().get('settings');
-            const merged = { ...current, ...settings };
+            const merged = { ...current, ...filtered };
             (0, store_1.getStore)().set('settings', merged);
             return { success: true };
         }
@@ -164,67 +172,68 @@ function setupIpcHandlers(steam, idle, steamAccount) {
             return { success: false, error: e.message };
         }
     });
-    // (legacy inline fetch kept below for reference — no longer reachable)
-    electron_1.ipcMain.handle('__GET_STEAM_FEATURED_UNUSED__', async () => {
-        try {
-            const [catRes, featRes] = await Promise.allSettled([
-                axios_1.default.get('https://store.steampowered.com/api/featuredcategories/?cc=us&l=english', { timeout: 8000 }),
-                axios_1.default.get('https://store.steampowered.com/api/featured/?cc=us&l=english', { timeout: 8000 }),
-            ]);
-            const deals = [];
-            const featured = [];
-            const freeGames = [];
-            const seen = new Set();
-            const toGame = (item, type) => ({
-                id: item.id,
-                name: item.name,
-                header_image: item.header_image ||
-                    `https://cdn.cloudflare.steamstatic.com/steam/apps/${item.id}/header.jpg`,
-                discount_percent: item.discount_percent ?? 0,
-                final_price: item.final_price ?? 0,
-                original_price: item.original_price ?? 0,
-                type: (item.final_price === 0 && item.original_price === 0) ? 'free'
-                    : (item.discount_percent ?? 0) > 0 ? 'sale' : type,
-                url: `https://store.steampowered.com/app/${item.id}`,
-            });
-            if (catRes.status === 'fulfilled') {
-                // Weekly specials / deals
-                const specials = catRes.value.data?.specials?.items ?? [];
-                for (const item of specials.slice(0, 8)) {
-                    if (!item.id || seen.has(item.id))
-                        continue;
-                    seen.add(item.id);
-                    deals.push(toGame(item, 'sale'));
-                }
-                // Free This Week: free-to-play + free weekend promos
-                const freePool = [
-                    ...(catRes.value.data?.free_to_play?.items ?? []),
-                    ...(catRes.value.data?.free_weekend?.items ?? []),
-                ];
-                for (const item of freePool.slice(0, 6)) {
-                    if (!item.id || seen.has(item.id))
-                        continue;
-                    seen.add(item.id);
-                    freeGames.push(toGame(item, 'free'));
-                }
-            }
-            if (featRes.status === 'fulfilled') {
-                for (const cat of ['large_capsules', 'featured_win', 'featured_mac']) {
-                    const items = featRes.value.data?.[cat] ?? [];
-                    for (const item of items) {
-                        if (!item.id || seen.has(item.id))
-                            continue;
-                        seen.add(item.id);
-                        featured.push(toGame(item, 'featured'));
-                    }
-                }
-            }
-            return { success: true, data: { deals: deals.slice(0, 8), featured: featured.slice(0, 6), freeGames: freeGames.slice(0, 6) } };
+    // (legacy inline fetch — REMOVED, kept here only as a comment for reference)
+    /* ipcMain.handle('__GET_STEAM_FEATURED_UNUSED__', async () => {
+      try {
+        const [catRes, featRes] = await Promise.allSettled([
+          axios.get('https://store.steampowered.com/api/featuredcategories/?cc=us&l=english', { timeout: 8000 }),
+          axios.get('https://store.steampowered.com/api/featured/?cc=us&l=english', { timeout: 8000 }),
+        ])
+  
+        const deals: FeaturedGame[] = []
+        const featured: FeaturedGame[] = []
+        const freeGames: FeaturedGame[] = []
+        const seen = new Set<number>()
+  
+        const toGame = (item: any, type: FeaturedGame['type']): FeaturedGame => ({
+          id: item.id,
+          name: item.name,
+          header_image: item.header_image ||
+            `https://cdn.cloudflare.steamstatic.com/steam/apps/${item.id}/header.jpg`,
+          discount_percent: item.discount_percent ?? 0,
+          final_price: item.final_price ?? 0,
+          original_price: item.original_price ?? 0,
+          type: (item.final_price === 0 && item.original_price === 0) ? 'free'
+              : (item.discount_percent ?? 0) > 0 ? 'sale' : type,
+          url: `https://store.steampowered.com/app/${item.id}`,
+        })
+  
+        if (catRes.status === 'fulfilled') {
+          // Weekly specials / deals
+          const specials: any[] = catRes.value.data?.specials?.items ?? []
+          for (const item of specials.slice(0, 8)) {
+            if (!item.id || seen.has(item.id)) continue
+            seen.add(item.id)
+            deals.push(toGame(item, 'sale'))
+          }
+          // Free This Week: free-to-play + free weekend promos
+          const freePool: any[] = [
+            ...(catRes.value.data?.free_to_play?.items ?? []),
+            ...(catRes.value.data?.free_weekend?.items ?? []),
+          ]
+          for (const item of freePool.slice(0, 6)) {
+            if (!item.id || seen.has(item.id)) continue
+            seen.add(item.id)
+            freeGames.push(toGame(item, 'free'))
+          }
         }
-        catch (e) {
-            return { success: false, error: e.message };
+  
+        if (featRes.status === 'fulfilled') {
+          for (const cat of ['large_capsules', 'featured_win', 'featured_mac']) {
+            const items: any[] = featRes.value.data?.[cat] ?? []
+            for (const item of items) {
+              if (!item.id || seen.has(item.id)) continue
+              seen.add(item.id)
+              featured.push(toGame(item, 'featured'))
+            }
+          }
         }
-    });
+  
+        return { success: true, data: { deals: deals.slice(0, 8), featured: featured.slice(0, 6), freeGames: freeGames.slice(0, 6) } }
+      } catch (e: any) {
+        return { success: false, error: e.message }
+      }
+    }) */
     electron_1.ipcMain.handle(types_1.IPC.SEARCH_GAMES, async (_e, term) => {
         try {
             const res = await axios_1.default.get(`https://store.steampowered.com/api/storesearch/?term=${encodeURIComponent(term)}&l=english&cc=us`, { timeout: 6000 });
@@ -310,7 +319,7 @@ function setupIpcHandlers(steam, idle, steamAccount) {
         try {
             // Parse steamLoginSecure format: "76561198XXXXXXXXX||<jwt>" (may be URL-encoded)
             const decoded = decodeURIComponent(token.trim());
-            const refreshToken = decoded.includes('||') ? decoded.split('||')[1] : decoded;
+            const refreshToken = decoded.includes('||') ? decoded.split('||').pop() : decoded;
             await steamAccount.loginWithRefreshToken(refreshToken);
             // Persist token for auto-reconnect
             const store = (0, store_1.getStore)();
@@ -405,13 +414,29 @@ function setupIpcHandlers(steam, idle, steamAccount) {
     });
     // Download a partner app installer to the user's Downloads folder
     electron_1.ipcMain.handle(types_1.IPC.DOWNLOAD_PARTNER_APP, async (_e, key, url, fileName) => {
+        // Security: validate URL is from a trusted GitHub releases domain
+        const ALLOWED_HOSTS = ['github.com', 'objects.githubusercontent.com'];
+        try {
+            const parsed = new URL(url);
+            if (!ALLOWED_HOSTS.some(h => parsed.hostname === h || parsed.hostname.endsWith('.' + h))) {
+                return { success: false, error: 'Download URL is not from a trusted source' };
+            }
+        }
+        catch {
+            return { success: false, error: 'Invalid download URL' };
+        }
+        // Security: sanitize fileName to prevent path traversal
+        const safeName = path.basename(fileName);
+        if (!safeName || safeName.startsWith('.')) {
+            return { success: false, error: 'Invalid file name' };
+        }
         const pushProgress = (p) => {
             for (const win of electron_1.BrowserWindow.getAllWindows()) {
                 if (!win.isDestroyed())
                     win.webContents.send(types_1.IPC.PARTNER_APP_DOWNLOAD_PROGRESS, p);
             }
         };
-        const destPath = path.join(electron_1.app.getPath('downloads'), fileName);
+        const destPath = path.join(electron_1.app.getPath('downloads'), safeName);
         try {
             const res = await axios_1.default.get(url, {
                 responseType: 'stream',
@@ -441,9 +466,6 @@ function setupIpcHandlers(steam, idle, steamAccount) {
                 res.data.on('error', reject);
             });
             pushProgress({ key, percent: 100, done: true, filePath: destPath });
-            // Small grace period to ensure Windows fully releases the handle before launching
-            await new Promise(r => setTimeout(r, 300));
-            await electron_1.shell.openPath(destPath);
             return { success: true };
         }
         catch (e) {
