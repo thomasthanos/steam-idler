@@ -97,6 +97,17 @@ export class SteamAccountManager extends EventEmitter {
       this.client = client
 
       let settled = false
+      // Safety timeout: if neither loggedOn nor error fires within 15s,
+      // reject the promise so the UI doesn't hang on "Connecting…" forever.
+      const loginTimeout = setTimeout(() => {
+        if (!settled) {
+          settled = true
+          cleanup()
+          this._setStatus('disconnected')
+          try { client.logOff() } catch { /* ok */ }
+          reject(new Error('Login timed out — Steam did not respond within 15 seconds'))
+        }
+      }, 15_000)
 
       const onLoggedOn = () => {
         // Capture accountId from client.steamID (set by steam-user after logon).
@@ -107,17 +118,25 @@ export class SteamAccountManager extends EventEmitter {
           this._accountId = accountId
           console.log(`[steam-account] AccountId captured: ${accountId}`)
         }
-      }
 
-      const onAccountInfo = (name: string) => {
-        this._username = name
+        // Resolve immediately on loggedOn — don't wait for accountInfo which
+        // may never fire with certain token types (web session JWTs from
+        // steamLoginSecure cookies). Username will be updated asynchronously
+        // if/when accountInfo arrives.
         if (!settled) {
           settled = true
+          clearTimeout(loginTimeout)
           cleanup()
           this._isLoggedOn = true
           this._setStatus('connected')
           resolve()
         }
+      }
+
+      const onAccountInfo = (name: string) => {
+        this._username = name
+        // Re-emit status-changed so the renderer updates the displayed username
+        this.emit('status-changed', this.getStatusInfo())
       }
 
       const onError = (err: Error & { eresult?: number }) => {
@@ -136,6 +155,7 @@ export class SteamAccountManager extends EventEmitter {
 
         if (!settled) {
           settled = true
+          clearTimeout(loginTimeout)
           cleanup()
           reject(err)
         }
@@ -143,12 +163,11 @@ export class SteamAccountManager extends EventEmitter {
 
       const cleanup = () => {
         client.removeListener('loggedOn',     onLoggedOn)
-        client.removeListener('accountInfo',  onAccountInfo)
         client.removeListener('error',        onError)
       }
 
       client.on('loggedOn', onLoggedOn)
-      client.once('accountInfo', onAccountInfo)
+      client.on('accountInfo', onAccountInfo)
       client.once('error', onError)
 
       // Persistent handlers for reconnect events (autoRelogin=false so these
