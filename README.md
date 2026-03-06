@@ -24,23 +24,6 @@ A modern Steam Achievement Manager & Game Idler built with **Electron**, **React
 
 ---
 
-## 🛠️ Tech Stack
-
-| | |
-|---|---|
-| **Electron 28** | Cross-platform shell |
-| **React 18 + React Router 6** | Renderer SPA |
-| **TypeScript 5** | End-to-end types |
-| **TailwindCSS 3 + Framer Motion** | Styling & animations |
-| **steamworks.js** | Native Steamworks SDK bindings |
-| **steam-user + steam-session** | CM protocol, QR/token auth, game launch events |
-| **Vite 5** | Renderer bundler with HMR |
-| **electron-store** | Persistent settings & idle stats |
-| **electron-updater** | Auto-update via GitHub Releases |
-| **axios** | Steam Web API & Store calls |
-
----
-
 ## 🚀 Getting Started
 
 **Prerequisites:** Node.js ≥ 18, npm ≥ 9, Steam running & logged in.
