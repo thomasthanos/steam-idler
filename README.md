@@ -103,9 +103,3 @@ src/
 ## ⚠️ Disclaimer
 
 Modifying Steam achievements may violate the [Steam Subscriber Agreement](https://store.steampowered.com/subscriber_agreement/). Use at your own risk. Not affiliated with or endorsed by Valve Corporation.
-
----
-
-## 📄 License
-
-MIT
