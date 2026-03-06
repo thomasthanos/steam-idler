@@ -140,6 +140,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
               })
               .catch(() => { /* silent */ })
               .finally(() => setIsLoadingGames(false))
+            refreshUser()
           }
 
           for (const cb of callbacks) cb.resolve()
@@ -148,7 +149,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
       }, 150)
     })
-  }, [])
+  }, [refreshUser])
 
   // Cleanup debounce timer on unmount (prevents state updates after unmount)
   useEffect(() => {

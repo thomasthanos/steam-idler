@@ -496,7 +496,7 @@ app.whenReady().then(async () => {
         try {
           const token = Buffer.from(settings.steamRefreshToken!, 'base64').toString('utf8')
           steamAccountManager.loginWithRefreshToken(token).catch(e => {
-            console.error('[steam-account] Auto-reconnect failed:', e)
+            console.warn('[steam-account] Auto-reconnect failed (will retry on next launch):', e?.message ?? e)
           })
         } catch { /* ok */ }
       }, 2000)

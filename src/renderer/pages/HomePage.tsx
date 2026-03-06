@@ -1,7 +1,7 @@
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Trophy, Key,
+  Trophy,
   Tag, ExternalLink, Star, Gift, Clock,
   Gamepad2, ChevronRight, ChevronLeft, TrendingUp,
 } from 'lucide-react'
@@ -295,7 +295,7 @@ function IdlingNowWidget({ games }: { games: { appId: number; name: string }[] }
 
 // ─── Main ──────────────────────────────────────────────────────────────────
 export default function HomePage() {
-  const { steamRunning, settings, games, featuredData, isLoadingFeatured } = useAppContext()
+  const { games, featuredData, isLoadingFeatured } = useAppContext()
   const navigate = useNavigate()
   const { deals, featured, freeGames } = featuredData
   const loadingDeals = isLoadingFeatured
@@ -329,25 +329,6 @@ export default function HomePage() {
     <div className="h-full overflow-y-auto" style={{ background: 'var(--bg)' }}>
       <div className="max-w-3xl mx-auto px-6 py-6 space-y-6">
 
-
-        {/* API key hint */}
-        {steamRunning && !settings.steamApiKey && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }}
-            className="flex items-start gap-3 px-4 py-3 rounded-xl"
-            style={{ background: 'rgba(59,130,246,0.07)', border: '1px solid rgba(59,130,246,0.18)' }}
-          >
-            <Key className="w-4 h-4 mt-0.5 shrink-0" style={{ color: 'var(--accent)' }} />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold" style={{ color: 'var(--accent)' }}>Add a Steam API Key</p>
-              <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>
-                Without a key only installed games are shown.{' '}
-                <button onClick={() => navigate('/settings')} className="underline" style={{ color: 'var(--accent)' }}>
-                  Open Settings →
-                </button>
-              </p>
-            </div>
-          </motion.div>
-        )}
 
         {/* ── Idling Now ── */}
         <AnimatePresence>

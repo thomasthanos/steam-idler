@@ -1,10 +1,8 @@
 /**
  * GameImage.tsx
  *
- * Fix #8 – Replace the unbounded module-level Map with an LRU cache so
- *          memory doesn't grow indefinitely when a user browses a large Steam
- *          library.  The cache is capped at MAX_CACHE_SIZE entries; the least-
- *          recently-used entry is evicted when the cap is reached.
+ * Probes URLs silently via the Electron main process (IPC → axios HEAD).
+ * No CORS issues, no 404 errors in the browser console.
  */
 
 import { useState, memo, useEffect, useRef } from 'react'
@@ -15,17 +13,12 @@ interface GameImageProps {
   className?: string
 }
 
-// Steam CDN image candidates, tried in order.
 const getCandidates = (appId: number) => [
   `https://cdn.cloudflare.steamstatic.com/steam/apps/${appId}/header.jpg`,
   `https://cdn.cloudflare.steamstatic.com/steam/apps/${appId}/capsule_231x87.jpg`,
 ]
 
-// ── LRU Cache ────────────────────────────────────────────────────────────────
-// Stores either the first working URL (string) or null (all candidates failed).
-// The insertion-order of Map entries is exploited: the oldest entry is always
-// `map.keys().next().value`.
-
+// ── LRU Cache ─────────────────────────────────────────────────────────────────
 const MAX_CACHE_SIZE = 500
 
 class LRUCache<K, V> {
@@ -34,7 +27,6 @@ class LRUCache<K, V> {
   get(key: K): V | undefined {
     if (!this.map.has(key)) return undefined
     const val = this.map.get(key)!
-    // Move to end (most-recently-used position)
     this.map.delete(key)
     this.map.set(key, val)
     return val
@@ -44,21 +36,37 @@ class LRUCache<K, V> {
     if (this.map.has(key)) this.map.delete(key)
     this.map.set(key, val)
     if (this.map.size > MAX_CACHE_SIZE) {
-      // Evict least-recently-used (first) entry
       const oldest = this.map.keys().next().value
       if (oldest !== undefined) this.map.delete(oldest)
     }
   }
-
-  has(key: K): boolean {
-    return this.map.has(key)
-  }
 }
 
-// Module-level so results persist across remounts and page navigation.
 const imageCache = new LRUCache<number, string | null>()
+const inFlight   = new Map<number, Promise<string | null>>()
 
-// ── Letter avatar ─────────────────────────────────────────────────────────────
+async function resolveUrl(appId: number): Promise<string | null> {
+  const cached = imageCache.get(appId)
+  if (cached !== undefined) return cached
+  if (inFlight.has(appId)) return inFlight.get(appId)!
+
+  const probe = (async () => {
+    for (const url of getCandidates(appId)) {
+      try {
+        const ok = await (window as any).steam.probeImage(url)
+        if (ok) { imageCache.set(appId, url); return url }
+      } catch { /* ignore */ }
+    }
+    imageCache.set(appId, null)
+    return null
+  })()
+
+  inFlight.set(appId, probe)
+  probe.finally(() => inFlight.delete(appId))
+  return probe
+}
+
+// ── Letter avatar ──────────────────────────────────────────────────────────────
 function LetterAvatar({ name }: { name: string }) {
   const letter = (name.trim().charAt(0) || '?').toUpperCase()
   let hash = 0
@@ -67,7 +75,7 @@ function LetterAvatar({ name }: { name: string }) {
   return (
     <div
       className="w-full h-full flex items-center justify-center font-semibold text-white/80 text-base select-none"
-      style={{ background: `linear-gradient(135deg, hsl(${hue},40%,20%), hsl(${(hue + 40) % 360},50%,28%))` }}
+      style={{ background: `linear-gradient(135deg, hsl(${hue},40%,20%), hsl(${(hue+40)%360},50%,28%))` }}
     >
       {letter}
     </div>
@@ -75,27 +83,19 @@ function LetterAvatar({ name }: { name: string }) {
 }
 
 const GameImage = memo(({ appId, name, className = '' }: GameImageProps) => {
-  const cached = imageCache.get(appId)
-  const candidates = getCandidates(appId)
-
-  const indexRef      = useRef(0)
-  const [src, setSrc] = useState<string>(cached !== undefined && cached !== null ? cached : candidates[0])
-  const [failed, setFailed] = useState<boolean>(cached === null)
+  const [src, setSrc] = useState<string | null>(() => imageCache.get(appId) ?? null)
+  const mountedRef = useRef(true)
 
   useEffect(() => {
+    mountedRef.current = true
     const hit = imageCache.get(appId)
-    if (hit !== undefined) {
-      indexRef.current = 0
-      setSrc(hit ?? candidates[0])
-      setFailed(hit === null)
-    } else {
-      indexRef.current = 0
-      setSrc(getCandidates(appId)[0])
-      setFailed(false)
-    }
+    if (hit !== undefined) { setSrc(hit); return }
+    setSrc(null)
+    resolveUrl(appId).then(url => { if (mountedRef.current) setSrc(url) })
+    return () => { mountedRef.current = false }
   }, [appId])
 
-  if (failed) return <LetterAvatar name={name} />
+  if (!src) return <LetterAvatar name={name} />
 
   return (
     <img
@@ -103,20 +103,6 @@ const GameImage = memo(({ appId, name, className = '' }: GameImageProps) => {
       alt={name}
       className={`w-full h-full object-cover ${className}`}
       loading="lazy"
-      onError={() => {
-        const next = indexRef.current + 1
-        indexRef.current = next
-        const nextUrl = getCandidates(appId)[next]
-        if (nextUrl) {
-          setSrc(nextUrl)
-        } else {
-          imageCache.set(appId, null)
-          setFailed(true)
-        }
-      }}
-      onLoad={() => {
-        if (imageCache.get(appId) === undefined) imageCache.set(appId, src)
-      }}
     />
   )
 })

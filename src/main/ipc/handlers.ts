@@ -2,7 +2,8 @@ import { app, ipcMain, Notification, BrowserWindow, shell } from 'electron'
 import * as path from 'path'
 import * as fs from 'fs'
 import axios from 'axios'
-import { IPC, IPCResponse, AppSettings, IdleGame, FeaturedGame, PartnerAppRelease, PartnerAppDownloadProgress, SteamAccountStatusInfo, QrLoginEvent } from '../../shared/types'
+import { IPC, IPCResponse, AppSettings, IdleGame, IdleStats, FeaturedGame, PartnerAppRelease, PartnerAppDownloadProgress, SteamAccountStatusInfo, QrLoginEvent } from '../../shared/types'
+import { DEFAULT_IDLE_STATS } from '../store'
 import { SteamClient } from '../steam/client'
 import { IdleManager } from '../steam/idleManager'
 import { SteamAccountManager } from '../steam/steamUser'
@@ -109,6 +110,28 @@ export function setupIpcHandlers(steam: SteamClient, idle: IdleManager, steamAcc
   ipcMain.handle(IPC.IDLE_STATUS, () => {
     try { return { success: true, data: idle.getIdlingAppIds() } }
     catch (e: any) { return { success: false, error: e.message } }
+  })
+
+  ipcMain.handle(IPC.GET_IDLE_STATS, () => {
+    try {
+      const stats = { ...DEFAULT_IDLE_STATS, ...getStore().get('idleStats') } as IdleStats
+      // Check if today's counters need resetting
+      const today = new Date().toISOString().slice(0, 10)
+      if (stats.lastResetDate !== today) {
+        stats.todayGamesIdled = 0
+        stats.todaySecondsIdled = 0
+        stats.lastResetDate = today
+        getStore().set('idleStats', stats)
+      }
+      return { success: true, data: stats }
+    } catch (e: any) { return { success: false, error: e.message } }
+  })
+
+  ipcMain.handle(IPC.RESET_IDLE_STATS, () => {
+    try {
+      getStore().set('idleStats', DEFAULT_IDLE_STATS)
+      return { success: true }
+    } catch (e: any) { return { success: false, error: e.message } }
   })
 
   // ── Notifications ────────────────────────────────────────────────────────
@@ -352,6 +375,16 @@ export function setupIpcHandlers(steam: SteamClient, idle: IdleManager, steamAcc
   ipcMain.handle(IPC.STEAM_ACCOUNT_SET_INVISIBLE, () => {
     try { steamAccount.setInvisible(); return { success: true } }
     catch (e: any) { return { success: false, error: e.message } }
+  })
+
+  // ── Image probe (silent HEAD via main process — no CORS, no console 404s) ──
+  ipcMain.handle('image:probe', async (_e, url: string) => {
+    try {
+      const res = await axios.head(url, { timeout: 4000, validateStatus: () => true })
+      return { success: true, data: res.status >= 200 && res.status < 300 }
+    } catch {
+      return { success: true, data: false }
+    }
   })
 
   // ── Autostart ─────────────────────────────────────────────────────────────

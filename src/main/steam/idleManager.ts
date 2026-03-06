@@ -22,11 +22,15 @@ import * as path from 'path'
 import { EventEmitter } from 'events'
 import treeKill from 'tree-kill'
 import { SteamAccountManager } from './steamUser'
-import { getStore } from '../store'
+import { getStore, DEFAULT_IDLE_STATS } from '../store'
 
 export class IdleManager extends EventEmitter {
   private idlers = new Map<number, ChildProcess>()
   private names  = new Map<number, string>()
+  // Track start time per appId for session duration calculation
+  private _startTimes = new Map<number, number>()
+  // Track which appIds have been counted as "idled today" in the current session
+  private _countedToday = new Set<number>()
   private steamAccountManager: SteamAccountManager | null = null
   // Timer for delayed status restore — gives Steam time to fully close
   // the game process before we change persona state back.
@@ -120,6 +124,60 @@ export class IdleManager extends EventEmitter {
     this.emit('changed')
   }
 
+  // ─── Stats helpers ──────────────────────────────────────────────────────
+
+  private _getTodayStr(): string {
+    return new Date().toISOString().slice(0, 10)
+  }
+
+  private _recordIdleStart(appId: number): void {
+    this._startTimes.set(appId, Date.now())
+    const store = getStore()
+    const today = this._getTodayStr()
+    const stats = { ...DEFAULT_IDLE_STATS, ...store.get('idleStats') }
+
+    // Reset today's counters if it's a new day
+    if (stats.lastResetDate !== today) {
+      stats.todayGamesIdled = 0
+      stats.todaySecondsIdled = 0
+      stats.lastResetDate = today
+      this._countedToday.clear()
+    }
+
+    // Count unique game for today + all-time
+    if (!this._countedToday.has(appId)) {
+      this._countedToday.add(appId)
+      stats.todayGamesIdled += 1
+      stats.totalGamesIdled += 1
+    }
+
+    store.set('idleStats', stats)
+  }
+
+  private _recordIdleStop(appId: number): void {
+    const startTime = this._startTimes.get(appId)
+    if (!startTime) return
+    this._startTimes.delete(appId)
+
+    const elapsed = Math.floor((Date.now() - startTime) / 1000)
+    if (elapsed <= 0) return
+
+    const store = getStore()
+    const today = this._getTodayStr()
+    const stats = { ...DEFAULT_IDLE_STATS, ...store.get('idleStats') }
+
+    // Reset today if new day
+    if (stats.lastResetDate !== today) {
+      stats.todaySecondsIdled = 0
+      stats.todayGamesIdled = 0
+      stats.lastResetDate = today
+    }
+
+    stats.totalSecondsIdled += elapsed
+    stats.todaySecondsIdled += elapsed
+    store.set('idleStats', stats)
+  }
+
   /** Spawn the actual child process worker for an appId. */
   private _spawnWorker(appId: number): void {
     // Guard: stopIdle may have been called while waiting for the delay
@@ -163,6 +221,7 @@ export class IdleManager extends EventEmitter {
     })
 
     this.idlers.set(appId, proc)
+    this._recordIdleStart(appId)
     console.log(`[idle] Spawned worker for appId=${appId}`)
     this.emit('changed')
   }
@@ -198,6 +257,7 @@ export class IdleManager extends EventEmitter {
       try { proc.kill('SIGKILL') } catch { /* ok */ }
     }
 
+    this._recordIdleStop(appId)
     this.idlers.delete(appId)
     this.names.delete(appId)
     console.log(`[idle] Stopped idling appId=${appId}`)

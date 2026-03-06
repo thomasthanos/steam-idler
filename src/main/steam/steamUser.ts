@@ -105,7 +105,7 @@ export class SteamAccountManager extends EventEmitter {
           cleanup()
           this._setStatus('disconnected')
           try { client.logOff() } catch { /* ok */ }
-          reject(new Error('Login timed out — Steam did not respond within 15 seconds'))
+          reject(new Error('Login timed out — Steam did not respond within 15 seconds (check your connection or try again)'))
         }
       }, 15_000)
 

@@ -1,5 +1,7 @@
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import toast, { Toaster } from 'react-hot-toast'
+import { AnimatePresence, motion } from 'framer-motion'
+import { X } from 'lucide-react'
 import { useTheme } from './hooks/useTheme'
 import TitleBar from './components/TitleBar'
 import Sidebar from './components/Sidebar'
@@ -12,28 +14,35 @@ import SettingsPage from './pages/SettingsPage'
 import IdlePage from './pages/IdlePage'
 import AutoIdlePage from './pages/AutoIdlePage'
 import PortfolioPage from './pages/PortfolioPage'
+import SetupScreen from './components/SetupScreen'
 import { AppProvider, useAppContext } from './hooks/useAppContext'
 import { useEffect } from 'react'
 
 
 function AppShell() {
   useTheme()
-  const { refreshUser } = useAppContext()
+  const { refreshUser, settings } = useAppContext()
   const location = useLocation()
+  const navigate = useNavigate()
 
-  // Global keyboard shortcut: Ctrl+R → refresh Steam connection
+  const isSettings = location.pathname === '/settings'
+
+  // Global keyboard shortcut: Ctrl+R → refresh Steam connection, Escape → close settings
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'r') {
         e.preventDefault()
         refreshUser()
       }
+      if (e.key === 'Escape' && isSettings) {
+        navigate(-1)
+      }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [refreshUser])
+  }, [refreshUser, isSettings, navigate])
 
-  // In-app toast notifications for idle warnings (always visible regardless of page)
+  // In-app toast notifications for idle warnings
   useEffect(() => {
     const cleanup = window.steam.onIdleWarning((data) => {
       if (data.type === 'game-already-running') {
@@ -59,31 +68,55 @@ function AppShell() {
     return cleanup
   }, [])
 
+  const needsSetup = !settings.steamApiKey
+
   return (
     <div className="flex flex-col h-screen font-sans select-none overflow-hidden" style={{ background: 'var(--bg)', color: 'var(--text)' }}>
       <TitleBar />
       <UpdateBanner />
-      <div className="flex flex-1 overflow-hidden">
-        <Sidebar />
-        <main className="flex-1 overflow-hidden relative" style={{ background: 'var(--bg)' }}>
-          {/* Fix #6 – per-route error boundary so one crashed page doesn't
-              take down the shell (titlebar, sidebar, tray still work). */}
-          {/* key resets the boundary on route change so a crashed page
-              clears its error state when the user navigates elsewhere. */}
-          <ErrorBoundary label="page" key={location.pathname}>
-          <Routes>
-            <Route path="/" element={<Navigate to="/home" replace />} />
-            <Route path="/home" element={<HomePage />} />
-            <Route path="/games" element={<GamesPage />} />
-            <Route path="/achievements/:appId" element={<AchievementsPage />} />
-            <Route path="/settings" element={<SettingsPage />} />
-            <Route path="/idle" element={<IdlePage />} />
-            <Route path="/auto-idle" element={<AutoIdlePage />} />
-            <Route path="/portfolio" element={<PortfolioPage />} />
-          </Routes>
-          </ErrorBoundary>
-        </main>
-      </div>
+
+      {needsSetup ? (
+        <SetupScreen />
+      ) : (
+        <div className="flex-1 overflow-hidden relative flex flex-col">
+          {/* Normal app shell */}
+          <div className="flex flex-1 overflow-hidden">
+            <Sidebar />
+            <main className="flex-1 overflow-hidden relative" style={{ background: 'var(--bg)' }}>
+              <ErrorBoundary label="page" key={location.pathname}>
+                <Routes>
+                  <Route path="/" element={<Navigate to="/home" replace />} />
+                  <Route path="/home" element={<HomePage />} />
+                  <Route path="/games" element={<GamesPage />} />
+                  <Route path="/achievements/:appId" element={<AchievementsPage />} />
+                  <Route path="/idle" element={<IdlePage />} />
+                  <Route path="/auto-idle" element={<AutoIdlePage />} />
+                  <Route path="/portfolio" element={<PortfolioPage />} />
+                  <Route path="/settings" element={null} />
+                  {/* /settings is handled by the overlay below */}
+                </Routes>
+              </ErrorBoundary>
+            </main>
+          </div>
+
+          {/* Settings full-screen overlay */}
+          <AnimatePresence>
+            {isSettings && (
+              <motion.div
+                key="settings-overlay"
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 6 }}
+                transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                className="absolute inset-0 z-50"
+                style={{ background: 'var(--bg)' }}
+              >
+                <SettingsPage />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      )}
 
       <Toaster
         position="bottom-right"

@@ -53,6 +53,12 @@ const steamAPI = {
   getIdleStatus: (): Promise<IPCResponse<number[]>> =>
     ipcRenderer.invoke(IPC.IDLE_STATUS),
 
+  getIdleStats: (): Promise<IPCResponse<import('../shared/types').IdleStats>> =>
+    ipcRenderer.invoke(IPC.GET_IDLE_STATS),
+
+  resetIdleStats: (): Promise<IPCResponse<void>> =>
+    ipcRenderer.invoke(IPC.RESET_IDLE_STATS),
+
   onIdleChanged: (cb: () => void) => {
     ipcRenderer.on('idle:changed', cb)
     return () => ipcRenderer.removeListener('idle:changed', cb)
@@ -148,6 +154,10 @@ const steamAPI = {
     ipcRenderer.on(IPC.STEAM_ACCOUNT_STATUS_CHANGED, handler)
     return () => ipcRenderer.removeListener(IPC.STEAM_ACCOUNT_STATUS_CHANGED, handler)
   },
+
+  // Silent image probe (via main process — no CORS, no 404 console errors)
+  probeImage: (url: string): Promise<boolean> =>
+    ipcRenderer.invoke('image:probe', url).then((r: any) => r?.data ?? false),
 
   // Theme listener
   onThemeChange: (cb: (theme: 'dark' | 'light') => void) => {

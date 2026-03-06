@@ -1,8 +1,17 @@
 import Store from 'electron-store'
-import { AppSettings, DEFAULT_SETTINGS } from '../shared/types'
+import { AppSettings, DEFAULT_SETTINGS, IdleStats } from '../shared/types'
+
+export const DEFAULT_IDLE_STATS: IdleStats = {
+  totalGamesIdled: 0,
+  totalSecondsIdled: 0,
+  todayGamesIdled: 0,
+  todaySecondsIdled: 0,
+  lastResetDate: new Date().toISOString().slice(0, 10),
+}
 
 interface StoreSchema {
   settings: AppSettings
+  idleStats: IdleStats
   /** @deprecated Moved to games-cache.json — kept here only so migration cleanup in client.ts can compile */
   gamesCache?: unknown
 }
@@ -21,7 +30,7 @@ export function getStore(): Store<StoreSchema> {
   if (!_store) {
     _store = new Store<StoreSchema>({
       name: 'config',
-      defaults: { settings: DEFAULT_SETTINGS },
+      defaults: { settings: DEFAULT_SETTINGS, idleStats: DEFAULT_IDLE_STATS },
     })
   }
   return _store

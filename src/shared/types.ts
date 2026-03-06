@@ -51,6 +51,15 @@ export interface FeaturedResponse {
   freeGames: FeaturedGame[]
 }
 
+// ─── Idle Stats ─────────────────────────────────────────────────────────────
+export interface IdleStats {
+  totalGamesIdled: number       // all-time unique games idled
+  totalSecondsIdled: number     // all-time seconds idled
+  todayGamesIdled: number       // games idled today (resets at midnight)
+  todaySecondsIdled: number     // seconds idled today
+  lastResetDate: string         // ISO date string (YYYY-MM-DD)
+}
+
 // ─── Idle Game ────────────────────────────────────────────────────────────────
 export interface IdleGame {
   appId: number
@@ -101,6 +110,10 @@ export const IPC = {
 
   // Notifications
   SEND_NOTIFICATION: 'app:send-notification',
+
+  // Idle Stats
+  GET_IDLE_STATS:   'idle:get-stats',
+  RESET_IDLE_STATS: 'idle:reset-stats',
 
   // Worker control
   STOP_GAME: 'steam:stop-game',
