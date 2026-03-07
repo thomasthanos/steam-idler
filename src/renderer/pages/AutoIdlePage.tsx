@@ -44,9 +44,13 @@ export default function AutoIdlePage() {
   }, [])
 
   useEffect(() => {
-    window.steam.getIdleStatus().then(res => {
-      if (res.success && res.data) setIdlingIds(res.data)
-    })
+    const refresh = () => {
+      window.steam.getIdleStatus().then(res => {
+        if (res.success && res.data) setIdlingIds(res.data)
+      })
+    }
+    refresh()
+    return window.steam.onIdleChanged(refresh)
   }, [])
 
   const doSearch = useCallback(async (term: string) => {

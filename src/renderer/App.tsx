@@ -1,7 +1,7 @@
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
-import toast, { Toaster } from 'react-hot-toast'
+import { Toaster } from 'react-hot-toast'
+import { notify } from './components/CustomToast'
 import { AnimatePresence, motion } from 'framer-motion'
-import { X } from 'lucide-react'
 import { useTheme } from './hooks/useTheme'
 import TitleBar from './components/TitleBar'
 import Sidebar from './components/Sidebar'
@@ -46,23 +46,23 @@ function AppShell() {
   useEffect(() => {
     const cleanup = window.steam.onIdleWarning((data) => {
       if (data.type === 'game-already-running') {
-        toast(`⚠️ A Steam game is already running (AppID: ${data.appId}). Idling may conflict with the running game.`, {
-          duration: 6000,
-          style: {
-            background: 'var(--card)',
-            color: 'var(--text)',
-            border: '1px solid rgba(245,158,11,0.4)',
-          },
-        })
+        notify.warning(
+          'Game Conflict Detected',
+          `A Steam game is already running (AppID: ${data.appId}). Idling may conflict.`,
+          6000
+        )
       } else if (data.type === 'manual-game-detected') {
-        toast(`🛑 A Steam game was launched (AppID: ${data.appId}). All idling has been stopped.`, {
-          duration: 5000,
-          style: {
-            background: 'var(--card)',
-            color: 'var(--text)',
-            border: '1px solid rgba(239,68,68,0.4)',
-          },
-        })
+        notify.error(
+          'Idling Stopped',
+          `A Steam game was launched (AppID: ${data.appId}). All idling has been stopped.`,
+          5000
+        )
+      } else if (data.type === 'auto-idle-resumed') {
+        notify.success(
+          'Auto-Idle Resumed',
+          'Game closed. Auto-idle has been resumed.',
+          4000
+        )
       }
     })
     return cleanup
@@ -121,18 +121,9 @@ function AppShell() {
       <Toaster
         position="bottom-right"
         toastOptions={{
-          style: {
-            background: 'var(--card)',
-            color: 'var(--text)',
-            border: '1px solid var(--border)',
-            borderRadius: '12px',
-            fontFamily: 'Outfit, system-ui, sans-serif',
-            fontSize: '13px',
-            padding: '10px 14px',
-          },
-          success: { iconTheme: { primary: 'var(--green)', secondary: 'var(--card)' } },
-          error: { iconTheme: { primary: 'var(--red)', secondary: 'var(--card)' } },
+          custom: { style: { background: 'transparent', boxShadow: 'none', padding: 0 } },
         }}
+        containerStyle={{ bottom: 16, right: 16 }}
       />
     </div>
   )

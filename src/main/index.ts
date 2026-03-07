@@ -1,4 +1,5 @@
-import { app, BrowserWindow, ipcMain, nativeTheme, shell, Tray, Menu, nativeImage, Notification } from 'electron'
+import { app, BrowserWindow, ipcMain, nativeTheme, shell, Tray, Menu, nativeImage } from 'electron'
+import { showNotification } from './notificationManager'
 import { TRAY_ICONS } from './trayIcons'
 import * as path from 'path'
 import * as fs from 'fs'
@@ -28,50 +29,69 @@ idleManager.setSteamAccountManager(steamAccountManager)
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged
 
 // ─── Idle notification helper ─────────────────────────────────────────────
-function showIdleNotification(title: string, body: string): void {
+function showIdleNotification(title: string, body: string, variant: 'warning' | 'error' | 'success' | 'info' = 'info'): void {
   try {
-    if (!Notification.isSupported()) return
-    const iconCandidates = [
-      path.join(process.resourcesPath ?? '', 'notify.png'),
-      path.join(__dirname, '../../../resources/notify.png'),
-      path.join(app.getAppPath(), 'resources/notify.png'),
-      path.join(__dirname, '../../../resources/steam.png'),
-    ]
-    const icon = iconCandidates.find(p => { try { return fs.existsSync(p) } catch { return false } })
-    const n = new Notification({ title, body, silent: false, icon })
-    n.on('click', () => {
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.show()
-        mainWindow.focus()
-      }
+    showNotification({
+      title,
+      body,
+      variant,
+      duration: 5000,
+      onClick: () => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.show()
+          mainWindow.focus()
+        }
+      },
     })
-    n.show()
   } catch (e) {
     console.error('[notification] Failed:', e)
   }
 }
 
+// Helper: is the main window currently visible to the user (not hidden in tray)?
+function isWindowVisible(): boolean {
+  return !!(mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible() && !mainWindow.isMinimized())
+}
+
 // Notify when a manual game launch stops all idling
 idleManager.on('manual-game-detected', (appId: number) => {
+  // Always show native overlay notification (visible even when app is in tray)
   showIdleNotification(
     'Idling Stopped',
-    `A Steam game was launched (AppID: ${appId}). All idling has been stopped and your status has been restored.`,
+    `A Steam game was launched (AppID: ${appId}). All idling has been stopped.`,
+    'error',
   )
-  // Also send in-app notification (toast) for when OS notifications are disabled
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send('idle:warning', { type: 'manual-game-detected', appId })
+  // In-app toast ONLY when the window is open and visible
+  if (isWindowVisible()) {
+    mainWindow!.webContents.send('idle:warning', { type: 'manual-game-detected', appId })
+  }
+})
+
+// Notify when the manually launched game quits and idle resumes
+idleManager.on('manual-game-quit', () => {
+  // Always show native overlay notification
+  showIdleNotification(
+    'Auto-Idle Resumed',
+    'Your game has ended. Auto-idle has been resumed.',
+    'success',
+  )
+  // In-app toast ONLY when the window is open and visible
+  if (isWindowVisible()) {
+    mainWindow!.webContents.send('idle:warning', { type: 'auto-idle-resumed' })
   }
 })
 
 // Notify when starting idle while a game is already running
 idleManager.on('game-already-running', (appId: number) => {
+  // Always show native overlay notification
   showIdleNotification(
-    'Game Already Running',
-    `A Steam game is currently running (AppID: ${appId}). Idling will start, but it may conflict with the running game.`,
+    'Game Conflict Detected',
+    `A Steam game is currently running (AppID: ${appId}). Idling may conflict.`,
+    'warning',
   )
-  // Also send in-app notification (toast) for when OS notifications are disabled
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send('idle:warning', { type: 'game-already-running', appId })
+  // In-app toast ONLY when the window is open and visible
+  if (isWindowVisible()) {
+    mainWindow!.webContents.send('idle:warning', { type: 'game-already-running', appId })
   }
 })
 

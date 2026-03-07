@@ -41,6 +41,7 @@ import {
   readLoginUsers,
   AcfApp,
 } from './steamPaths'
+import { getWorkerPath } from './workerPath'
 import { getStore } from '../store'
 
 // ─── Persistent settings ───────────────────────────────────────────────────
@@ -123,13 +124,7 @@ class WorkerBridge {
   // Mutex: prevents concurrent ensure() calls from spawning two workers
   private initPromise: Promise<void> | null = null
 
-  private get workerPath(): string {
-    // In a packaged app, worker.js is extracted from app.asar into
-    // app.asar.unpacked so it can be spawned as a child process.
-    // In dev, __dirname does not contain 'app.asar' so the replace is a no-op.
-    return path.join(__dirname, 'worker.js')
-      .replace('app.asar' + path.sep, 'app.asar.unpacked' + path.sep)
-  }
+  private get workerPath(): string { return getWorkerPath() }
 
   async ensure(appId: number): Promise<void> {
     // If an init is already in-flight, wait for it to complete before checking

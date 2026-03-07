@@ -26,6 +26,25 @@ interface StoreSchema {
 // and would resolve to the wrong (default Electron) userData directory.
 let _store: Store<StoreSchema> | null = null
 
+/**
+ * Returns the current idle stats, resetting today's counters if the date has
+ * changed since they were last written. Mutates and persists the store when a
+ * reset is needed. Single source of truth — replaces the duplicated reset
+ * blocks that previously existed in both handlers.ts and idleManager.ts.
+ */
+export function getIdleStatsResetting(): IdleStats {
+  const store = getStore()
+  const stats = { ...DEFAULT_IDLE_STATS, ...store.get('idleStats') } as IdleStats
+  const today = new Date().toISOString().slice(0, 10)
+  if (stats.lastResetDate !== today) {
+    stats.todayGamesIdled = 0
+    stats.todaySecondsIdled = 0
+    stats.lastResetDate = today
+    store.set('idleStats', stats)
+  }
+  return stats
+}
+
 export function getStore(): Store<StoreSchema> {
   if (!_store) {
     _store = new Store<StoreSchema>({

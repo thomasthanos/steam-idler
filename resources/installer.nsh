@@ -78,6 +78,7 @@ AutoCloseWindow true
 !macro customUnInstall
   DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\${UNINSTALL_APP_KEY}"
   DeleteRegKey HKCU "Software\Classes\AppUserModelId\com.ThomasThanos.SouvlatzidikoUnlocker"
+  DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "com.ThomasThanos.SouvlatzidikoUnlocker"
 
   ${ifNot} ${isUpdated}
     ${If} ${FileExists} "$LOCALAPPDATA\ThomasThanos\Souvlatzidiko-Unlocker\*.*"

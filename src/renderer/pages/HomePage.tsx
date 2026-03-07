@@ -6,6 +6,7 @@ import {
   Gamepad2, ChevronRight, ChevronLeft, TrendingUp,
 } from 'lucide-react'
 import { useAppContext } from '../hooks/useAppContext'
+import GameImage from '../components/GameImage'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useState, useEffect } from 'react'
 import { FeaturedGame } from '@shared/types'
@@ -273,11 +274,7 @@ function IdlingNowWidget({ games }: { games: { appId: number; name: string }[] }
             style={{ borderBottom: i < games.length - 1 ? '1px solid var(--border)' : 'none' }}
           >
             <div className="w-10 h-6 rounded overflow-hidden shrink-0" style={{ border: '1px solid var(--border)' }}>
-              <img
-                src={`https://cdn.cloudflare.steamstatic.com/steam/apps/${g.appId}/header.jpg`}
-                alt={g.name}
-                className="w-full h-full object-cover"
-              />
+              <GameImage appId={g.appId} name={g.name} />
             </div>
             <p className="text-xs font-medium flex-1 min-w-0 truncate" style={{ color: 'var(--text)' }}>{g.name}</p>
             <div className="flex items-center gap-1.5 shrink-0">
@@ -295,7 +292,7 @@ function IdlingNowWidget({ games }: { games: { appId: number; name: string }[] }
 
 // ─── Main ──────────────────────────────────────────────────────────────────
 export default function HomePage() {
-  const { games, featuredData, isLoadingFeatured } = useAppContext()
+  const { games, settings, featuredData, isLoadingFeatured } = useAppContext()
   const navigate = useNavigate()
   const { deals, featured, freeGames } = featuredData
   const loadingDeals = isLoadingFeatured
@@ -308,7 +305,10 @@ export default function HomePage() {
         if (res.success && res.data) {
           setIdlingGames(res.data.map(id => ({
             appId: id,
-            name: games.find(g => g.appId === id)?.name ?? `App ${id}`,
+            // Priority: games library → auto-idle saved list → generic fallback
+            name: games.find(g => g.appId === id)?.name
+              ?? settings.autoIdleGames?.find(g => g.appId === id)?.name
+              ?? `App ${id}`,
           })))
         }
       }).catch(() => {})
@@ -316,7 +316,7 @@ export default function HomePage() {
     refresh()
     const t = setInterval(refresh, 5000)
     return () => clearInterval(t)
-  }, [games])
+  }, [games, settings.autoIdleGames])
 
   // Computed stats
   const totalMins     = games.reduce((s, g) => s + g.playtimeForever, 0)
@@ -389,11 +389,7 @@ export default function HomePage() {
                   >
                     <span className="w-4 text-center text-xs font-bold tabular-nums shrink-0" style={{ color: colors[i] }}>{i + 1}</span>
                     <div className="w-10 h-6 rounded overflow-hidden shrink-0" style={{ border: '1px solid var(--border)' }}>
-                      <img
-                        src={`https://cdn.cloudflare.steamstatic.com/steam/apps/${game.appId}/header.jpg`}
-                        alt={game.name}
-                        className="w-full h-full object-cover"
-                      />
+                      <GameImage appId={game.appId} name={game.name} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-1">

@@ -64,8 +64,8 @@ const steamAPI = {
     return () => ipcRenderer.removeListener('idle:changed', cb)
   },
 
-  onIdleWarning: (cb: (data: { type: string; appId: number }) => void) => {
-    const handler = (_: unknown, data: { type: string; appId: number }) => cb(data)
+  onIdleWarning: (cb: (data: { type: string; appId?: number }) => void) => {
+    const handler = (_: unknown, data: { type: string; appId?: number }) => cb(data)
     ipcRenderer.on('idle:warning', handler)
     return () => { ipcRenderer.removeListener('idle:warning', handler) }
   },

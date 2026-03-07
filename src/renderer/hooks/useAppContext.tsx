@@ -1,7 +1,7 @@
 // @refresh reset
 import { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react'
 import { SteamUser, AppSettings, DEFAULT_SETTINGS, SteamGame, FeaturedGame } from '@shared/types'
-import toast from 'react-hot-toast'
+import { notify } from '../components/CustomToast'
 
 interface FeaturedData {
   deals: FeaturedGame[]
@@ -57,7 +57,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (userRes.success && userRes.data) setUser(userRes.data)
       }
     } catch {
-      toast.error('Failed to connect to Steam')
+      notify.error('Connection Failed', 'Failed to connect to Steam')
     } finally {
       setIsLoadingUser(false)
     }
@@ -72,10 +72,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setGames(res.data)
         setGamesFetched(true)
       } else {
-        toast.error(res.error ?? 'Failed to load games')
+        notify.error('Failed to Load Games', res.error ?? 'Could not retrieve your game library')
       }
     } catch {
-      toast.error('Failed to load games')
+      notify.error('Failed to Load Games', 'Could not retrieve your game library')
     } finally {
       setIsLoadingGames(false)
     }

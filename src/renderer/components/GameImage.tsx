@@ -67,17 +67,30 @@ async function resolveUrl(appId: number): Promise<string | null> {
 }
 
 // ── Letter avatar ──────────────────────────────────────────────────────────────
-function LetterAvatar({ name }: { name: string }) {
-  const letter = (name.trim().charAt(0) || '?').toUpperCase()
-  let hash = 0
-  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash)
-  const hue = Math.abs(hash) % 360
+function LetterAvatar({ appId, name }: { appId: number; name: string }) {
+  // If the name is a generic placeholder (e.g. "App 12345") show the last 4
+  // digits of the AppID instead — it's more useful than the letter "A".
+  const isGeneric = /^app\s+\d+$/i.test(name.trim())
+  const label = isGeneric
+    ? String(appId).slice(-4)           // e.g. "6230"
+    : (name.trim().charAt(0) || '?').toUpperCase()
+
+  // Derive a stable hue: use appId for generic names, name hash otherwise
+  const seed = isGeneric
+    ? appId
+    : name.split('').reduce((h, c) => c.charCodeAt(0) + ((h << 5) - h), 0)
+  const hue = Math.abs(seed) % 360
+
   return (
     <div
-      className="w-full h-full flex items-center justify-center font-semibold text-white/80 text-base select-none"
-      style={{ background: `linear-gradient(135deg, hsl(${hue},40%,20%), hsl(${(hue+40)%360},50%,28%))` }}
+      className="w-full h-full flex items-center justify-center font-semibold text-white/80 select-none"
+      style={{
+        background: `linear-gradient(135deg, hsl(${hue},40%,20%), hsl(${(hue + 40) % 360},50%,28%))`,
+        fontSize: isGeneric ? '0.55em' : '1em',
+        letterSpacing: isGeneric ? '-0.03em' : undefined,
+      }}
     >
-      {letter}
+      {label}
     </div>
   )
 }
@@ -95,7 +108,7 @@ const GameImage = memo(({ appId, name, className = '' }: GameImageProps) => {
     return () => { mountedRef.current = false }
   }, [appId])
 
-  if (!src) return <LetterAvatar name={name} />
+  if (!src) return <LetterAvatar appId={appId} name={name} />
 
   return (
     <img

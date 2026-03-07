@@ -875,10 +875,12 @@ export default function SettingsPage() {
             label="Auto-invisible when idling"
             description="Automatically switch to invisible mode when idling starts"
             highlight={settings.autoInvisibleWhenIdling}
+            disabled={accountInfo.status !== 'connected'}
           >
-            <Toggle 
-              value={settings.autoInvisibleWhenIdling} 
-              onChange={() => save({ autoInvisibleWhenIdling: !settings.autoInvisibleWhenIdling })} 
+            <Toggle
+              value={settings.autoInvisibleWhenIdling}
+              onChange={() => save({ autoInvisibleWhenIdling: !settings.autoInvisibleWhenIdling })}
+              disabled={accountInfo.status !== 'connected'}
             />
           </SettingItem>
 
@@ -887,11 +889,25 @@ export default function SettingsPage() {
             label="Stop on game launch"
             description="Pause idling when you launch any game"
             highlight={settings.stopIdleOnGameLaunch}
+          >
+            <Toggle
+              value={settings.stopIdleOnGameLaunch}
+              onChange={() => save({ stopIdleOnGameLaunch: !settings.stopIdleOnGameLaunch })}
+            />
+          </SettingItem>
+
+          <SettingItem
+            icon={Gamepad2}
+            label="Resume after game"
+            description="Automatically resume idling when your game closes"
+            highlight={settings.resumeIdleAfterGame}
+            disabled={!settings.stopIdleOnGameLaunch}
             className="border-b-0"
           >
-            <Toggle 
-              value={settings.stopIdleOnGameLaunch} 
-              onChange={() => save({ stopIdleOnGameLaunch: !settings.stopIdleOnGameLaunch })} 
+            <Toggle
+              value={settings.resumeIdleAfterGame}
+              onChange={() => save({ resumeIdleAfterGame: !settings.resumeIdleAfterGame })}
+              disabled={!settings.stopIdleOnGameLaunch}
             />
           </SettingItem>
         </SettingCard>

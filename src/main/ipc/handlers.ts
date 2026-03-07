@@ -1,9 +1,10 @@
-import { app, ipcMain, Notification, BrowserWindow, shell } from 'electron'
+import { app, ipcMain, BrowserWindow, shell } from 'electron'
+import { showNotification } from '../notificationManager'
 import * as path from 'path'
 import * as fs from 'fs'
 import axios from 'axios'
 import { IPC, IPCResponse, AppSettings, IdleGame, IdleStats, FeaturedGame, PartnerAppRelease, PartnerAppDownloadProgress, SteamAccountStatusInfo, QrLoginEvent } from '../../shared/types'
-import { DEFAULT_IDLE_STATS } from '../store'
+import { DEFAULT_IDLE_STATS, getIdleStatsResetting } from '../store'
 import { SteamClient } from '../steam/client'
 import { IdleManager } from '../steam/idleManager'
 import { SteamAccountManager } from '../steam/steamUser'
@@ -76,7 +77,7 @@ export function setupIpcHandlers(steam: SteamClient, idle: IdleManager, steamAcc
         'theme', 'steamApiKey', 'steamId', 'customAppIds', 'showGlobalPercent',
         'showHiddenAchievements', 'confirmBulkActions', 'minimizeToTray',
         'autostart', 'autoIdleGames', 'notificationsEnabled', 'notificationSound',
-        'autoInvisibleWhenIdling', 'stopIdleOnGameLaunch', 'steamRefreshToken',
+        'autoInvisibleWhenIdling', 'stopIdleOnGameLaunch', 'resumeIdleAfterGame', 'steamRefreshToken',
       ])
       const filtered = Object.fromEntries(
         Object.entries(settings).filter(([k]) => ALLOWED_KEYS.has(k))
@@ -114,16 +115,7 @@ export function setupIpcHandlers(steam: SteamClient, idle: IdleManager, steamAcc
 
   ipcMain.handle(IPC.GET_IDLE_STATS, () => {
     try {
-      const stats = { ...DEFAULT_IDLE_STATS, ...getStore().get('idleStats') } as IdleStats
-      // Check if today's counters need resetting
-      const today = new Date().toISOString().slice(0, 10)
-      if (stats.lastResetDate !== today) {
-        stats.todayGamesIdled = 0
-        stats.todaySecondsIdled = 0
-        stats.lastResetDate = today
-        getStore().set('idleStats', stats)
-      }
-      return { success: true, data: stats }
+      return { success: true, data: getIdleStatsResetting() }
     } catch (e: any) { return { success: false, error: e.message } }
   })
 
@@ -135,46 +127,17 @@ export function setupIpcHandlers(steam: SteamClient, idle: IdleManager, steamAcc
   })
 
   // ── Notifications ────────────────────────────────────────────────────────
-  ipcMain.handle(IPC.SEND_NOTIFICATION, (_e, title: string, body: string, silent: boolean) => {
+  // Custom overlay notifications via notificationManager.ts.
+  // `silent` flag is accepted for API compatibility but the overlay is
+  // always visual-only (no OS sound), so it is intentionally unused here.
+  ipcMain.handle(IPC.SEND_NOTIFICATION, (_e, title: string, body: string, _silent: boolean) => {
     try {
-      if (!Notification.isSupported()) return { success: false, error: 'Not supported' }
-
-      // Strip emoji on Windows — Segoe UI Emoji font isn’t always available in toast
-      const stripEmoji = (s: string) =>
-        s.replace(
-          /(?:[\u2700-\u27bf]|(?:\ud83c[\udde6-\uddff]){2}|[\ud800-\udbff][\udc00-\udfff]|[\u0023-\u0039]\ufe0f?\u20e3|\u3299|\u3297|\u303d|\u3030|\u24c2|\ud83c[\udd70-\udd71]|\ud83c[\udd7e-\udd7f]|\ud83c\udd8e|\ud83c[\udd91-\udd9a]|\ud83c[\udde6-\uddff]|\ud83c[\ude01-\ude02]|\ud83c\ude1a|\ud83c\ude2f|\ud83c[\ude32-\ude3a]|\ud83c[\ude50-\ude51]|\u203c|\u2049|[\u25aa-\u25ab]|\u25b6|\u25c0|[\u25fb-\u25fe]|\u00a9|\u00ae|\u2122|\u2139|\ud83c\udc04|[\u2600-\u26ff]|\u2b05|\u2b06|\u2b07|\u2b1b|\u2b1c|\u2b50|\u2b55|\u231a|\u231b|\u2328|\u23cf|[\u23e9-\u23f3]|[\u23f8-\u23fa]|\ud83c\udccf|\u2934|\u2935|[\u2190-\u21ff])/g,
-          ''
-        ).replace(/\s{2,}/g, ' ').trim()
-
-      const isWin = process.platform === 'win32'
-      if (isWin) {
-        title = stripEmoji(title)
-        body  = stripEmoji(body)
+      const settings = getStore().get('settings')
+      if (settings.notificationsEnabled) {
+        showNotification({ title, body, variant: 'info', duration: 5000 })
       }
-
-      const iconCandidates = [
-        path.join(__dirname, '../../../resources/notify.png'),
-        path.join(app.getAppPath(), 'resources/notify.png'),
-        path.join(process.resourcesPath ?? '', 'notify.png'),
-        // fallback to steam.png if notify.png not found
-        path.join(__dirname, '../../../resources/steam.png'),
-        path.join(app.getAppPath(), 'resources/steam.png'),
-      ]
-      const iconPath = iconCandidates.find(p => { try { return fs.existsSync(p) } catch { return false } }) ?? iconCandidates[0]
-
-      const n = new Notification({
-        title,
-        body,
-        silent,
-        icon: iconPath,
-        // Windows-specific: show the notification for longer
-        ...(isWin ? { timeoutType: 'default' as const } : {}),
-      })
-      n.show()
       return { success: true }
-    } catch (e: any) {
-      return { success: false, error: e.message }
-    }
+    } catch (e: any) { return { success: false, error: e.message } }
   })
 
   // ── Steam Store Featured / Deals (proxied from main to avoid CORS) ────────
@@ -189,69 +152,6 @@ export function setupIpcHandlers(steam: SteamClient, idle: IdleManager, steamAcc
       return { success: false, error: e.message }
     }
   })
-
-  // (legacy inline fetch — REMOVED, kept here only as a comment for reference)
-  /* ipcMain.handle('__GET_STEAM_FEATURED_UNUSED__', async () => {
-    try {
-      const [catRes, featRes] = await Promise.allSettled([
-        axios.get('https://store.steampowered.com/api/featuredcategories/?cc=us&l=english', { timeout: 8000 }),
-        axios.get('https://store.steampowered.com/api/featured/?cc=us&l=english', { timeout: 8000 }),
-      ])
-
-      const deals: FeaturedGame[] = []
-      const featured: FeaturedGame[] = []
-      const freeGames: FeaturedGame[] = []
-      const seen = new Set<number>()
-
-      const toGame = (item: any, type: FeaturedGame['type']): FeaturedGame => ({
-        id: item.id,
-        name: item.name,
-        header_image: item.header_image ||
-          `https://cdn.cloudflare.steamstatic.com/steam/apps/${item.id}/header.jpg`,
-        discount_percent: item.discount_percent ?? 0,
-        final_price: item.final_price ?? 0,
-        original_price: item.original_price ?? 0,
-        type: (item.final_price === 0 && item.original_price === 0) ? 'free'
-            : (item.discount_percent ?? 0) > 0 ? 'sale' : type,
-        url: `https://store.steampowered.com/app/${item.id}`,
-      })
-
-      if (catRes.status === 'fulfilled') {
-        // Weekly specials / deals
-        const specials: any[] = catRes.value.data?.specials?.items ?? []
-        for (const item of specials.slice(0, 8)) {
-          if (!item.id || seen.has(item.id)) continue
-          seen.add(item.id)
-          deals.push(toGame(item, 'sale'))
-        }
-        // Free This Week: free-to-play + free weekend promos
-        const freePool: any[] = [
-          ...(catRes.value.data?.free_to_play?.items ?? []),
-          ...(catRes.value.data?.free_weekend?.items ?? []),
-        ]
-        for (const item of freePool.slice(0, 6)) {
-          if (!item.id || seen.has(item.id)) continue
-          seen.add(item.id)
-          freeGames.push(toGame(item, 'free'))
-        }
-      }
-
-      if (featRes.status === 'fulfilled') {
-        for (const cat of ['large_capsules', 'featured_win', 'featured_mac']) {
-          const items: any[] = featRes.value.data?.[cat] ?? []
-          for (const item of items) {
-            if (!item.id || seen.has(item.id)) continue
-            seen.add(item.id)
-            featured.push(toGame(item, 'featured'))
-          }
-        }
-      }
-
-      return { success: true, data: { deals: deals.slice(0, 8), featured: featured.slice(0, 6), freeGames: freeGames.slice(0, 6) } }
-    } catch (e: any) {
-      return { success: false, error: e.message }
-    }
-  }) */
 
   ipcMain.handle(IPC.SEARCH_GAMES, async (_e, term: string) => {
     try {
@@ -335,16 +235,13 @@ export function setupIpcHandlers(steam: SteamClient, idle: IdleManager, steamAcc
   })
 
   // ── Cookie / refresh-token login ──────────────────────────────────────────
-  // `token` is the raw steamLoginSecure cookie value (may contain steamId64||<jwt> or just <jwt>)
   ipcMain.handle(IPC.STEAM_ACCOUNT_TOKEN_LOGIN, async (_e, token: string) => {
     try {
-      // Parse steamLoginSecure format: "76561198XXXXXXXXX||<jwt>" (may be URL-encoded)
       const decoded = decodeURIComponent(token.trim())
       const refreshToken = decoded.includes('||') ? decoded.split('||').pop()! : decoded
 
       await steamAccount.loginWithRefreshToken(refreshToken)
 
-      // Persist token for auto-reconnect
       const store = getStore()
       const current = store.get('settings')
       store.set('settings', { ...current, steamRefreshToken: Buffer.from(refreshToken).toString('base64') })
@@ -389,16 +286,15 @@ export function setupIpcHandlers(steam: SteamClient, idle: IdleManager, steamAcc
 
   // ── Autostart ─────────────────────────────────────────────────────────────
   ipcMain.handle(IPC.AUTOSTART_GET, () => {
+    if (!app.isPackaged) return { success: true, data: false }
     try { return { success: true, data: app.getLoginItemSettings().openAtLogin } }
     catch { return { success: true, data: false } }
   })
 
   ipcMain.handle(IPC.AUTOSTART_SET, (_e, enabled: boolean) => {
+    if (!app.isPackaged) return { success: true, data: false }
     try {
-      app.setLoginItemSettings({
-        openAtLogin: enabled,
-        openAsHidden: true,
-      })
+      app.setLoginItemSettings({ openAtLogin: enabled, openAsHidden: true })
       return { success: true, data: enabled }
     } catch (e: any) {
       return { success: false, error: e.message }
@@ -414,7 +310,6 @@ export function setupIpcHandlers(steam: SteamClient, idle: IdleManager, steamAcc
     { key: 'discordviewer', owner: 'thomasthanos', repo: 'discord_package_viewer' },
   ]
 
-  // Fetch latest release info for both partner apps from GitHub API
   ipcMain.handle(IPC.GET_PARTNER_APP_RELEASES, async (): Promise<IPCResponse<PartnerAppRelease[]>> => {
     try {
       const results = await Promise.all(
@@ -444,9 +339,7 @@ export function setupIpcHandlers(steam: SteamClient, idle: IdleManager, steamAcc
     }
   })
 
-  // Download a partner app installer to the user's Downloads folder
   ipcMain.handle(IPC.DOWNLOAD_PARTNER_APP, async (_e, key: string, url: string, fileName: string): Promise<IPCResponse<void>> => {
-    // Security: validate URL is from a trusted GitHub releases domain
     const ALLOWED_HOSTS = ['github.com', 'objects.githubusercontent.com']
     try {
       const parsed = new URL(url)
@@ -457,7 +350,6 @@ export function setupIpcHandlers(steam: SteamClient, idle: IdleManager, steamAcc
       return { success: false, error: 'Invalid download URL' }
     }
 
-    // Security: sanitize fileName to prevent path traversal
     const safeName = path.basename(fileName)
     if (!safeName || safeName.startsWith('.')) {
       return { success: false, error: 'Invalid file name' }
@@ -498,7 +390,6 @@ export function setupIpcHandlers(steam: SteamClient, idle: IdleManager, steamAcc
 
       await new Promise<void>((resolve, reject) => {
         res.data.pipe(writer)
-        // Use 'close' (not 'finish') — 'close' fires after the OS releases the file handle
         writer.on('close', resolve)
         writer.on('error', reject)
         res.data.on('error', reject)

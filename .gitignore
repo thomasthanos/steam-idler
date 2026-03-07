@@ -4,3 +4,4 @@
 /dist
 /.claude
 RELEASE_NOTES.md
+/node_modules

@@ -22,7 +22,8 @@ import * as path from 'path'
 import { EventEmitter } from 'events'
 import treeKill from 'tree-kill'
 import { SteamAccountManager } from './steamUser'
-import { getStore, DEFAULT_IDLE_STATS } from '../store'
+import { getStore, DEFAULT_IDLE_STATS, getIdleStatsResetting } from '../store'
+import { getWorkerPath } from './workerPath'
 
 export class IdleManager extends EventEmitter {
   private idlers = new Map<number, ChildProcess>()
@@ -48,11 +49,11 @@ export class IdleManager extends EventEmitter {
   // manual launch detection so the polling doesn't immediately kill the idle.
   // Cleared when the game quits (RunningAppID → 0) or when all idle stops.
   private _knownRunningAtStart = new Set<number>()
+  // Games to resume after the manually launched game quits.
+  private _resumeGames = new Map<number, string>()
+  private _resumeWatchInterval: ReturnType<typeof setInterval> | null = null
 
-  private get workerPath(): string {
-    return path.join(__dirname, 'worker.js')
-      .replace('app.asar' + path.sep, 'app.asar.unpacked' + path.sep)
-  }
+  private get workerPath(): string { return getWorkerPath() }
 
   setSteamAccountManager(manager: SteamAccountManager): void {
     this.steamAccountManager = manager
@@ -78,9 +79,10 @@ export class IdleManager extends EventEmitter {
     // Only active when stopIdleOnGameLaunch is enabled.
     manager.on('game-launched', (appId: number) => {
       if (!getStore().get('settings').stopIdleOnGameLaunch) return
-      if (this.idlers.size > 0 && !this.isIdling(appId)) {
-        console.log(`[idle] Manual game launch detected (appId=${appId}) — stopping all idle`)
-        this.stopAll()
+      const totalActive = this.idlers.size + this._pendingSpawns.size
+      if (totalActive > 0 && !this.isIdling(appId)) {
+        console.log(`[idle] Manual game launch detected via CM (appId=${appId}) — stopping all idle`)
+        this._handleManualGameLaunch(appId)
       }
     })
   }
@@ -126,23 +128,13 @@ export class IdleManager extends EventEmitter {
 
   // ─── Stats helpers ──────────────────────────────────────────────────────
 
-  private _getTodayStr(): string {
-    return new Date().toISOString().slice(0, 10)
-  }
-
   private _recordIdleStart(appId: number): void {
     this._startTimes.set(appId, Date.now())
     const store = getStore()
-    const today = this._getTodayStr()
-    const stats = { ...DEFAULT_IDLE_STATS, ...store.get('idleStats') }
+    const stats = getIdleStatsResetting()
 
-    // Reset today's counters if it's a new day
-    if (stats.lastResetDate !== today) {
-      stats.todayGamesIdled = 0
-      stats.todaySecondsIdled = 0
-      stats.lastResetDate = today
-      this._countedToday.clear()
-    }
+    // Clear the daily unique-game set when a new day resets the counters
+    if (stats.todayGamesIdled === 0) this._countedToday.clear()
 
     // Count unique game for today + all-time
     if (!this._countedToday.has(appId)) {
@@ -163,16 +155,7 @@ export class IdleManager extends EventEmitter {
     if (elapsed <= 0) return
 
     const store = getStore()
-    const today = this._getTodayStr()
-    const stats = { ...DEFAULT_IDLE_STATS, ...store.get('idleStats') }
-
-    // Reset today if new day
-    if (stats.lastResetDate !== today) {
-      stats.todaySecondsIdled = 0
-      stats.todayGamesIdled = 0
-      stats.lastResetDate = today
-    }
-
+    const stats = getIdleStatsResetting()
     stats.totalSecondsIdled += elapsed
     stats.todaySecondsIdled += elapsed
     store.set('idleStats', stats)
@@ -295,6 +278,7 @@ export class IdleManager extends EventEmitter {
     this._pendingSpawns.clear()
     this._knownRunningAtStart.clear()
     this._stopGameDetectionPolling()
+    this._stopResumeWatching()
 
     if (opts.skipRestore) {
       // During app quit: kill processes without touching Steam persona state
@@ -382,8 +366,61 @@ export class IdleManager extends EventEmitter {
 
       if (appId > 0 && !this.isIdling(appId) && !this._knownRunningAtStart.has(appId)) {
         console.log(`[idle] Manual game launch detected via registry (appId=${appId}) — stopping all idle`)
-        this.emit('manual-game-detected', appId)
-        this.stopAll()
+        this._handleManualGameLaunch(appId)
+      }
+    })
+  }
+
+  /**
+   * Central handler for manual game launch detection (from either CM or
+   * registry polling). Saves currently idling games, stops all idle, then
+   * starts watching for the game to quit so idle can be resumed.
+   */
+  private _handleManualGameLaunch(appId: number): void {
+    const gamesToResume = new Map(this.names)
+    this.emit('manual-game-detected', appId)
+    this.stopAll()
+    if ((getStore().get('settings').resumeIdleAfterGame ?? true) && gamesToResume.size > 0) {
+      this._resumeGames = gamesToResume
+      this._startResumeWatching()
+    }
+  }
+
+  private _startResumeWatching(): void {
+    if (process.platform !== 'win32') return
+    if (this._resumeWatchInterval) return
+    console.log(`[idle] Watching for game quit — will resume ${this._resumeGames.size} game(s)`)
+    this._resumeWatchInterval = setInterval(
+      () => this._checkResumeGame(),
+      IdleManager.GAME_DETECTION_POLL_MS,
+    )
+  }
+
+  private _stopResumeWatching(): void {
+    if (this._resumeWatchInterval) {
+      clearInterval(this._resumeWatchInterval)
+      this._resumeWatchInterval = null
+    }
+    this._resumeGames.clear()
+  }
+
+  private _checkResumeGame(): void {
+    execFile('reg', ['query', 'HKCU\\Software\\Valve\\Steam', '/v', 'RunningAppID'], {
+      timeout: 3000,
+      windowsHide: true,
+    }, (err, stdout) => {
+      if (err) return
+      const match = stdout.match(/RunningAppID\s+REG_DWORD\s+0x([0-9a-fA-F]+)/)
+      if (!match) return
+      const appId = parseInt(match[1], 16)
+      if (appId !== 0) return  // game still running
+
+      const toResume = new Map(this._resumeGames)
+      this._stopResumeWatching()
+      console.log(`[idle] Manual game quit — resuming ${toResume.size} game(s)`)
+      this.emit('manual-game-quit')
+      for (const [id, name] of toResume) {
+        this.startIdle(id, name)
       }
     })
   }
