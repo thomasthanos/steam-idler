@@ -1,14 +1,14 @@
 import { app, BrowserWindow, ipcMain, nativeTheme, shell, Tray, Menu, nativeImage } from 'electron'
-import { showNotification } from './notificationManager'
-import { TRAY_ICONS } from './trayIcons'
+import { showNotification } from './managers/notificationManager'
+import { TRAY_ICONS } from './managers/trayIcons'
 import * as path from 'path'
 import * as fs from 'fs'
 import { setupIpcHandlers } from './ipc/handlers'
-import { performStartupUpdateCheck, setupUpdater, triggerBackgroundCheck, willUpdateInstall, SplashEvent, PreloadFn } from './updater'
+import { performStartupUpdateCheck, setupUpdater, triggerBackgroundCheck, willUpdateInstall, SplashEvent, PreloadFn } from './managers/updater'
 import { SteamClient } from './steam/client'
 import { IdleManager } from './steam/idleManager'
 import { SteamAccountManager } from './steam/steamUser'
-import { getStore } from './store'
+import { getStore } from './managers/store'
 
 // ─── Set app identity FIRST — must be before any new Store() call ─────────────
 app.setName('Souvlatzidiko-Unlocker')
@@ -146,8 +146,8 @@ function getIconPath(size: '256' | '32' | 'png' = '256'): string {
 
   const candidates = [
     path.join(process.resourcesPath ?? '', filename),
-    path.join(__dirname, '../../../resources', filename),
-    path.join(app.getAppPath(), 'resources', filename),
+    path.join(__dirname, '../../../src/assets/icons', filename),
+    path.join(app.getAppPath(), 'src/assets/icons', filename),
   ]
   for (const p of candidates) {
     try { if (fs.existsSync(p)) return p } catch { /* ok */ }
@@ -157,8 +157,8 @@ function getIconPath(size: '256' | '32' | 'png' = '256'): string {
 
 function getSplashHtmlPath(): string {
   const candidates = [
-    path.join(__dirname, '../../../resources/splash.html'),
-    path.join(app.getAppPath(), 'resources/splash.html'),
+    path.join(__dirname, '../../../src/assets/splash.html'),
+    path.join(app.getAppPath(), 'src/assets/splash.html'),
     path.join(process.resourcesPath ?? '', 'splash.html'),
   ]
   for (const p of candidates) {
@@ -522,6 +522,27 @@ app.whenReady().then(async () => {
       }, 2000)
     }
 
+    // Mid-session reconnect: when steam-user loses its CM connection (network
+    // drop, Steam restart, session expiry), try once with the stored token.
+    // A 10-second delay avoids hammering Steam if it momentarily drops the
+    // connection during a restart/update.
+    let _reconnectTimer: ReturnType<typeof setTimeout> | null = null
+    steamAccountManager.on('auto-reconnect-needed', () => {
+      if (_reconnectTimer) return // already scheduled
+      _reconnectTimer = setTimeout(() => {
+        _reconnectTimer = null
+        const current = getStore().get('settings')
+        if (!current.steamRefreshToken) return
+        console.log('[steam-account] Attempting mid-session reconnect…')
+        try {
+          const token = Buffer.from(current.steamRefreshToken, 'base64').toString('utf8')
+          steamAccountManager.loginWithRefreshToken(token).catch(e => {
+            console.warn('[steam-account] Mid-session reconnect failed:', e?.message ?? e)
+          })
+        } catch { /* ok */ }
+      }, 10_000)
+    })
+
   })
 })
 
@@ -551,7 +572,13 @@ export function forceQuit() {
   idleManager.removeAllListeners('changed')
   tray?.destroy()
   tray = null
-  // skipRestore=true: don't open steam:// URLs while the app is shutting down
+  // Restore Steam persona state before stopping idle workers.
+  // Do it FIRST (before workers exit) so Steam has time to process the
+  // status change while the CM session is still alive.
+  if (idleManager.getIdlingAppIds().length > 0) {
+    steamAccountManager.restoreStatus()
+  }
+  // skipRestore=true: restoreStatus() already called above
   idleManager.stopAll({ skipRestore: true })
   steamAccountManager.destroy()
   const timeout = setTimeout(() => app.exit(0), 3000)

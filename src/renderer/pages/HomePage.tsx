@@ -8,7 +8,7 @@ import {
 import { useAppContext } from '../hooks/useAppContext'
 import GameImage from '../components/GameImage'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { FeaturedGame } from '@shared/types'
 
 // ─── Game card for Steam Store ─────────────────────────────────────────────
@@ -219,24 +219,30 @@ function formatPlaytime(minutes: number): string {
 // ─── Idling Now Widget ────────────────────────────────────────────────────
 function IdlingNowWidget({ games }: { games: { appId: number; name: string }[] }) {
   const [now, setNow] = useState(Date.now())
-  // Track per-game start time so each game shows its own elapsed time
+  // Start times come from the main process so they survive navigation / re-mounts.
+  // A ref holds the live merged map; state is used only to trigger re-renders.
+  const startTimesRef = useRef<Record<number, number>>({})
   const [startTimes, setStartTimes] = useState<Record<number, number>>({})
 
-  // Register start time for each new game
+  // Fetch authoritative start times from the main process whenever the set of
+  // idling games changes.  This fixes the timer-reset-on-category-change bug:
+  // previously times were local state and reset on every unmount/remount.
+  const gameKey = games.map(g => g.appId).join(',')
   useEffect(() => {
-    setStartTimes(prev => {
-      const updated = { ...prev }
-      const ts = Date.now()
-      for (const g of games) {
-        if (!(g.appId in updated)) updated[g.appId] = ts
+    window.steam.getIdleStartTimes().then(res => {
+      if (res.success && res.data) {
+        const merged: Record<number, number> = {}
+        for (const g of games) {
+          // Prefer the authoritative main-process time; fall back to any
+          // locally cached value (e.g. while the IPC round-trip is in flight).
+          merged[g.appId] = res.data[g.appId] ?? startTimesRef.current[g.appId] ?? Date.now()
+        }
+        startTimesRef.current = merged
+        setStartTimes(merged)
       }
-      // Remove games no longer idling
-      for (const key of Object.keys(updated)) {
-        if (!games.some(g => g.appId === Number(key))) delete updated[Number(key)]
-      }
-      return updated
-    })
-  }, [games])
+    }).catch(() => {})
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gameKey])
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000)

@@ -22,7 +22,7 @@ import * as path from 'path'
 import { EventEmitter } from 'events'
 import treeKill from 'tree-kill'
 import { SteamAccountManager } from './steamUser'
-import { getStore, DEFAULT_IDLE_STATS, getIdleStatsResetting } from '../store'
+import { getStore, DEFAULT_IDLE_STATS, getIdleStatsResetting } from '../managers/store'
 import { getWorkerPath } from './workerPath'
 
 export class IdleManager extends EventEmitter {
@@ -268,6 +268,38 @@ export class IdleManager extends EventEmitter {
     return this.idlers.has(appId) || this._pendingSpawns.has(appId)
   }
 
+  /**
+   * Returns the epoch-ms start time for each currently-idling appId.
+   * Pending (not-yet-spawned) games are included with the current time as a
+   * conservative estimate so the UI can display a timer immediately.
+   */
+  getIdleStartTimes(): Record<number, number> {
+    const now = Date.now()
+    const result: Record<number, number> = {}
+    for (const id of this.idlers.keys()) {
+      result[id] = this._startTimes.get(id) ?? now
+    }
+    for (const id of this._pendingSpawns.keys()) {
+      result[id] = this._startTimes.get(id) ?? now
+    }
+    return result
+  }
+
+  /**
+   * Returns the total live elapsed seconds for ALL currently-idling games
+   * (sum across all active workers). Used to augment stored stats with
+   * in-progress time so the Settings page shows accurate real-time figures.
+   */
+  getLiveElapsedSeconds(): number {
+    const now = Date.now()
+    let total = 0
+    for (const id of this.idlers.keys()) {
+      const start = this._startTimes.get(id)
+      if (start) total += Math.floor((now - start) / 1000)
+    }
+    return total
+  }
+
   stopAll(opts: { skipRestore?: boolean } = {}): void {
     // Cancel all pending spawns and game detection polling
     for (const [appId, timer] of this._pendingSpawns) {
@@ -281,8 +313,10 @@ export class IdleManager extends EventEmitter {
     this._stopResumeWatching()
 
     if (opts.skipRestore) {
-      // During app quit: kill processes without touching Steam persona state
+      // During app quit: kill processes without touching Steam persona state.
+      // Still save idle-time stats so the session is not lost.
       for (const [appId, proc] of [...this.idlers.entries()]) {
+        this._recordIdleStop(appId)  // ← persist elapsed time before killing
         try { proc.stdin!.end() } catch { /* ok */ }
         const pid = proc.pid
         if (pid !== undefined) {
@@ -298,6 +332,7 @@ export class IdleManager extends EventEmitter {
     } else {
       const hadIdlers = this.idlers.size > 0 || hadPending
       for (const [appId, proc] of [...this.idlers.entries()]) {
+        this._recordIdleStop(appId)  // ← persist elapsed time
         try { proc.stdin!.end() } catch { /* ok */ }
         const pid = proc.pid
         if (pid !== undefined) {

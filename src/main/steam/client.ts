@@ -42,7 +42,7 @@ import {
   AcfApp,
 } from './steamPaths'
 import { getWorkerPath } from './workerPath'
-import { getStore } from '../store'
+import { getStore } from '../managers/store'
 
 // ─── Persistent settings ───────────────────────────────────────────────────
 function getSettings(): AppSettings { return getStore().get('settings') }

@@ -13,6 +13,9 @@ export default function IdlePage() {
     window.steam.sendNotification(title, body, !settings.notificationSound).catch(() => {})
   }
   const [idlingIds, setIdlingIds] = useState<number[]>([])
+  // Names keyed by appId, sourced from the idle manager via getIdlingGames().
+  // This is the source-of-truth for the "Currently Idling" display.
+  const [idlingNames, setIdlingNames] = useState<Record<number, string>>({})
   const [idlingSince, setIdlingSince] = useState<Record<number, number>>({})
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState<Record<number, boolean>>({})
@@ -22,24 +25,51 @@ export default function IdlePage() {
   // (tray stop-all, manual game launch detection, worker crashes, etc.)
   useEffect(() => {
     const refresh = () => {
-      window.steam.getIdleStatus().then(res => {
+      // Use getIdlingGames() so we always get the authoritative names from the
+      // idle manager — this fixes the "App 12345" fallback appearing in
+      // "Currently Idling" when the game was started from the Auto-Idle page
+      // or via auto-idle-on-launch (where names come from settings, not library).
+      window.steam.getIdlingGames().then(res => {
         if (res.success && res.data) {
-          // Preserve existing timestamps for games still running
+          const nowMs = Date.now()
           setIdlingSince(old => {
             const next: Record<number, number> = {}
-            const ts = Date.now()
-            for (const id of res.data!) {
-              next[id] = old[id] ?? ts
+            for (const g of res.data!) {
+              next[g.appId] = old[g.appId] ?? nowMs
             }
             return next
           })
-          setIdlingIds(res.data!)
+          setIdlingIds(res.data!.map(g => g.appId))
+          // Store names so "Currently Idling" can display them without
+          // falling back to a library lookup or a generic App ID label.
+          setIdlingNames(prev => {
+            const next = { ...prev }
+            for (const g of res.data!) next[g.appId] = g.name
+            // Remove entries for games no longer idling
+            for (const id of Object.keys(next)) {
+              if (!res.data!.some(g => g.appId === Number(id))) delete next[Number(id)]
+            }
+            return next
+          })
         }
-      })
+      }).catch(() => {})
     }
+    // Also seed start times from the main process on mount so elapsed timers
+    // survive navigation away and back to this page.
+    window.steam.getIdleStartTimes().then(res => {
+      if (res.success && res.data) {
+        setIdlingSince(old => {
+          const merged: Record<number, number> = { ...old }
+          for (const [id, ts] of Object.entries(res.data!)) {
+            if (!(Number(id) in merged)) merged[Number(id)] = ts
+          }
+          return merged
+        })
+      }
+    }).catch(() => {})
+
     refresh()
     const cleanupIdleChanged = window.steam.onIdleChanged(refresh)
-    // Fix #2 – cleanup the interval on unmount
     const t = setInterval(() => setNow(Date.now()), 1000)
     return () => { clearInterval(t); cleanupIdleChanged() }
   }, [])
@@ -101,12 +131,14 @@ export default function IdlePage() {
     }
   }
 
-  // Currently idling games (from our local context, enriched)
-  const currentlyIdling = idlingIds
-    .map(id => {
-      const g = games.find(x => x.appId === id)
-      return g ? { appId: id, name: g.name } : { appId: id, name: `App ${id}` }
-    })
+  // Currently idling games — priority: (1) idle manager's name map, (2) library, (3) fallback.
+  const currentlyIdling = idlingIds.map(id => ({
+    appId: id,
+    name: idlingNames[id]
+      ?? games.find(x => x.appId === id)?.name
+      ?? settings.autoIdleGames?.find(a => a.appId === id)?.name
+      ?? `App ${id}`,
+  }))
 
   return (
     <div className="h-full overflow-y-auto" style={{ background: 'var(--bg)' }}>

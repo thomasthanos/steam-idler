@@ -177,6 +177,8 @@ export class SteamAccountManager extends EventEmitter {
           this._isLoggedOn = false
           this._setStatus('disconnected')
           console.log(`[steam-account] Disconnected: ${msg}`)
+          // Signal the main process to attempt a reconnect with the stored token
+          this.emit('auto-reconnect-needed')
         }
       })
 
@@ -206,6 +208,8 @@ export class SteamAccountManager extends EventEmitter {
         this._username = null
         this._setStatus('disconnected')
         try { client.logOff() } catch { /* ok */ }
+        // Signal the main process to attempt a reconnect with the stored token
+        this.emit('auto-reconnect-needed')
       })
 
       client.logOn({ refreshToken })

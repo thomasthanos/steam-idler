@@ -13,7 +13,7 @@
 
 import { BrowserWindow, ipcMain } from 'electron'
 import { autoUpdater, UpdateInfo, ProgressInfo } from 'electron-updater'
-import { IPC, UpdaterState } from '../shared/types'
+import { IPC, UpdaterState } from '../../shared/types'
 
 // ─── Update-will-install flag ────────────────────────────────────────────────
 // Tracks whether an update has been downloaded and is about to install.

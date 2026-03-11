@@ -112,8 +112,10 @@ export const IPC = {
   SEND_NOTIFICATION: 'app:send-notification',
 
   // Idle Stats
-  GET_IDLE_STATS:   'idle:get-stats',
-  RESET_IDLE_STATS: 'idle:reset-stats',
+  GET_IDLE_STATS:        'idle:get-stats',
+  RESET_IDLE_STATS:      'idle:reset-stats',
+  IDLE_GET_START_TIMES:  'idle:get-start-times',
+  IDLE_GET_GAMES:        'idle:get-games',
 
   // Worker control
   STOP_GAME: 'steam:stop-game',

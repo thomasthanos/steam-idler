@@ -400,11 +400,18 @@ export default function SettingsPage() {
     }).catch(() => {})
   }, [])
 
+  // Refresh idle stats whenever the idle section is active and every 30 s
+  // so the displayed hours include currently-running sessions.
   useEffect(() => {
-    window.steam.getIdleStats().then(res => {
-      if (res.success && res.data) setIdleStats(res.data)
-    }).catch(() => {})
-  }, [])
+    const fetch = () => {
+      window.steam.getIdleStats().then(res => {
+        if (res.success && res.data) setIdleStats(res.data)
+      }).catch(() => {})
+    }
+    fetch()
+    const t = setInterval(fetch, 30_000)
+    return () => clearInterval(t)
+  }, [activeSection])
 
   useEffect(() => {
     window.steam.steamAccountStatus().then(res => {

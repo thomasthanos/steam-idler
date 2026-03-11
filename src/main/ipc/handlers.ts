@@ -1,14 +1,14 @@
 import { app, ipcMain, BrowserWindow, shell } from 'electron'
-import { showNotification } from '../notificationManager'
+import { showNotification } from '../managers/notificationManager'
 import * as path from 'path'
 import * as fs from 'fs'
 import axios from 'axios'
 import { IPC, IPCResponse, AppSettings, IdleGame, IdleStats, FeaturedGame, PartnerAppRelease, PartnerAppDownloadProgress, SteamAccountStatusInfo, QrLoginEvent } from '../../shared/types'
-import { DEFAULT_IDLE_STATS, getIdleStatsResetting } from '../store'
+import { DEFAULT_IDLE_STATS, getIdleStatsResetting } from '../managers/store'
 import { SteamClient } from '../steam/client'
 import { IdleManager } from '../steam/idleManager'
 import { SteamAccountManager } from '../steam/steamUser'
-import { getStore } from '../store'
+import { getStore } from '../managers/store'
 
 function wrap<T>(fn: () => Promise<T>): Promise<IPCResponse<T>> {
   return fn()
@@ -115,8 +115,32 @@ export function setupIpcHandlers(steam: SteamClient, idle: IdleManager, steamAcc
 
   ipcMain.handle(IPC.GET_IDLE_STATS, () => {
     try {
-      return { success: true, data: getIdleStatsResetting() }
+      const stats = getIdleStatsResetting()
+      // Add live elapsed time for currently-running sessions so the Settings
+      // page shows accurate figures even while games are actively being idled.
+      const liveSeconds = idle.getLiveElapsedSeconds()
+      return {
+        success: true,
+        data: {
+          ...stats,
+          totalSecondsIdled: stats.totalSecondsIdled + liveSeconds,
+          todaySecondsIdled: stats.todaySecondsIdled + liveSeconds,
+        },
+      }
     } catch (e: any) { return { success: false, error: e.message } }
+  })
+
+  ipcMain.handle(IPC.IDLE_GET_START_TIMES, () => {
+    try { return { success: true, data: idle.getIdleStartTimes() } }
+    catch (e: any) { return { success: false, error: e.message } }
+  })
+
+  // Returns idling games WITH their names (from the idle manager's internal
+  // names map) — used by the IdlePage "Currently Idling" section so games
+  // started from outside the library still show a proper name.
+  ipcMain.handle(IPC.IDLE_GET_GAMES, () => {
+    try { return { success: true, data: idle.getIdlingGames() } }
+    catch (e: any) { return { success: false, error: e.message } }
   })
 
   ipcMain.handle(IPC.RESET_IDLE_STATS, () => {

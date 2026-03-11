@@ -1,5 +1,5 @@
 import Store from 'electron-store'
-import { AppSettings, DEFAULT_SETTINGS, IdleStats } from '../shared/types'
+import { AppSettings, DEFAULT_SETTINGS, IdleStats } from '../../shared/types'
 
 export const DEFAULT_IDLE_STATS: IdleStats = {
   totalGamesIdled: 0,

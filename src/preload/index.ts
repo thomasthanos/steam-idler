@@ -59,6 +59,14 @@ const steamAPI = {
   resetIdleStats: (): Promise<IPCResponse<void>> =>
     ipcRenderer.invoke(IPC.RESET_IDLE_STATS),
 
+  /** Returns epoch-ms start times keyed by appId for all currently-idling games. */
+  getIdleStartTimes: (): Promise<IPCResponse<Record<number, number>>> =>
+    ipcRenderer.invoke(IPC.IDLE_GET_START_TIMES),
+
+  /** Returns idling games with their names as stored by the idle manager. */
+  getIdlingGames: (): Promise<IPCResponse<{ appId: number; name: string }[]>> =>
+    ipcRenderer.invoke(IPC.IDLE_GET_GAMES),
+
   onIdleChanged: (cb: () => void) => {
     ipcRenderer.on('idle:changed', cb)
     return () => ipcRenderer.removeListener('idle:changed', cb)
