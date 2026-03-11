@@ -100,6 +100,9 @@ const steamAPI = {
   // Auto-updater
   checkForUpdates: (): Promise<IPCResponse<void>> =>
     ipcRenderer.invoke(IPC.UPDATER_CHECK),
+  restartAndInstall: (): void => {
+    ipcRenderer.invoke(IPC.UPDATER_RESTART).catch(() => {})
+  },
   onUpdaterStatus: (cb: (state: import('../shared/types').UpdaterState) => void) => {
     const handler = (_: unknown, state: import('../shared/types').UpdaterState) => cb(state)
     ipcRenderer.on(IPC.UPDATER_STATUS, handler)

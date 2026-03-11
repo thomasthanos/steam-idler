@@ -62,5 +62,5 @@
     "shortcutName": "Souvlatzidiko-Unlocker",
     "include": "src/assets/installer.nsh",
     "warningsAsErrors": false
-  },
+  }
 }

@@ -9,8 +9,6 @@ export function useUpdater() {
     return unsub
   }, [])
 
-  // Manually trigger an update check from the UI (e.g. Settings page button).
-  // The actual download + restart are fully automatic once an update is found.
   const check = useCallback(async () => {
     setState({ status: 'checking' })
     await window.steam.checkForUpdates()
