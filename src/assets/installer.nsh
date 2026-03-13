@@ -70,6 +70,15 @@ AutoCloseWindow true
   ; AppUserModelID — must match app.setAppUserModelId() in main process
   WriteRegStr HKCU "Software\Classes\AppUserModelId\com.ThomasThanos.SouvlatzidikoUnlocker" "DisplayName" "Souvlatzidiko-Unlocker"
   WriteRegStr HKCU "Software\Classes\AppUserModelId\com.ThomasThanos.SouvlatzidikoUnlocker" "IconUri" "$INSTDIR\resources\all_steam_x256.ico"
+
+  ; Auto-relaunch after a silent update (triggered by electron-updater).
+  ; electron-builder's generated NSIS template sets ${isUpdated} when the
+  ; installer is invoked via quitAndInstall(), but the relaunch Exec can
+  ; get lost when a custom installer.nsh is present. We add it explicitly
+  ; here as a reliable fallback.
+  ${if} ${isUpdated}
+    Exec '"$INSTDIR\Souvlatzidiko-Unlocker.exe"'
+  ${endIf}
 !macroend
 
 ; ============================================================================
