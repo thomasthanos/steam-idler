@@ -24,6 +24,7 @@ import { LoginSession, EAuthTokenPlatformType } from 'steam-session'
 import * as QRCode from 'qrcode'
 import { SteamAccountConnectionStatus, SteamAccountStatusInfo, QrLoginEvent } from '../../shared/types'
 import { getSteamPath, parseTextVdf, VdfObject } from './steamPaths'
+import { getStore } from '../managers/store'
 
 // EPersonaState values used in localconfig.vdf
 const PERSONA_STATE_NAMES: Record<number, string> = {
@@ -56,10 +57,12 @@ function readPersonaStateDesired(accountId: number): number {
 }
 
 /** Change Steam persona state via the steam:// URL protocol (no CM traffic). */
-function setPersonaViaProtocol(state: 'online' | 'away' | 'invisible' | 'offline' | 'busy' | 'snooze'): void {
-  shell.openExternal(`steam://friends/status/${state}`).catch(e => {
+async function setPersonaViaProtocol(state: 'online' | 'away' | 'invisible' | 'offline' | 'busy' | 'snooze'): Promise<void> {
+  try {
+    await shell.openExternal(`steam://friends/status/${state}`)
+  } catch (e) {
     console.error(`[steam-account] Failed to open steam:// URL for state "${state}":`, e)
-  })
+  }
 }
 
 export class SteamAccountManager extends EventEmitter {
@@ -292,6 +295,7 @@ export class SteamAccountManager extends EventEmitter {
     this._username = null
     this._accountId = null
     this._preIdleStateName = null
+    try { getStore().delete('preIdleStatus') } catch { /* ok */ }
     this._setStatus('disconnected')
   }
 
@@ -301,8 +305,12 @@ export class SteamAccountManager extends EventEmitter {
    * Read the user's current status from localconfig.vdf and go Invisible.
    * Guard: requires _accountId (set at first login) — NOT _isLoggedOn,
    * because the steam:// protocol works even after steam-user disconnects.
+   *
+   * Returns a Promise that resolves once the steam:// URL has been dispatched,
+   * so callers can wait before spawning workers (avoiding the race where
+   * Steam shows "In-Game" before the invisible status takes effect).
    */
-  setInvisible(): void {
+  async setInvisible(): Promise<void> {
     if (!this._accountId) return
 
     // Read the CURRENT state fresh from disk right before we change it,
@@ -315,9 +323,11 @@ export class SteamAccountManager extends EventEmitter {
     // (e.g. setInvisible called twice before a restoreStatus)
     if (!this._preIdleStateName) {
       this._preIdleStateName = stateName
+      // Persist to disk so it survives crashes / unexpected shutdowns
+      try { getStore().set('preIdleStatus', stateName) } catch { /* ok */ }
     }
 
-    setPersonaViaProtocol('invisible')
+    await setPersonaViaProtocol('invisible')
     console.log(`[steam-account] Status → Invisible (was: ${this._preIdleStateName})`)
   }
 
@@ -330,8 +340,34 @@ export class SteamAccountManager extends EventEmitter {
 
     const state = (this._preIdleStateName ?? 'online') as Parameters<typeof setPersonaViaProtocol>[0]
     this._preIdleStateName = null  // clear so next idle session captures fresh
+    // Clear persisted pre-idle status — restore is done
+    try { getStore().delete('preIdleStatus') } catch { /* ok */ }
     setPersonaViaProtocol(state)
     console.log(`[steam-account] Status restored → ${state}`)
+  }
+
+  /**
+   * Restore an orphaned pre-idle status from a previous session that
+   * crashed or was killed before restoreStatus() could run.
+   * Called once at startup — requires _accountId to be set.
+   */
+  restoreOrphanedStatus(): void {
+    try {
+      const store = getStore()
+      const orphaned = store.get('preIdleStatus')
+      if (!orphaned) return
+      // Clear it immediately so we don't keep restoring on every startup
+      store.delete('preIdleStatus')
+
+      if (!this._accountId) {
+        console.log(`[steam-account] Orphaned pre-idle status "${orphaned}" found but no accountId — skipping restore`)
+        return
+      }
+
+      const state = orphaned as Parameters<typeof setPersonaViaProtocol>[0]
+      setPersonaViaProtocol(state)
+      console.log(`[steam-account] Restored orphaned pre-idle status → ${state} (from previous session)`)
+    } catch { /* ok */ }
   }
 
   // ─── Cleanup ──────────────────────────────────────────────────────────────

@@ -81,6 +81,18 @@ idleManager.on('manual-game-quit', () => {
   }
 })
 
+// Notify when Steam quits while idle is running
+idleManager.on('steam-disappeared', () => {
+  showIdleNotification(
+    'Steam Closed',
+    'Steam is no longer running. All idling has been stopped.',
+    'error',
+  )
+  if (isWindowVisible()) {
+    mainWindow!.webContents.send('idle:warning', { type: 'steam-disappeared' })
+  }
+})
+
 // Notify when starting idle while a game is already running
 idleManager.on('game-already-running', (appId: number) => {
   // Always show native overlay notification
@@ -501,13 +513,28 @@ app.whenReady().then(async () => {
     setupUpdater()
 
     if (settings.autoIdleGames?.length) {
-      for (const game of settings.autoIdleGames) {
-        try {
-          idleManager.startIdle(game.appId, game.name)  // Fix: pass game.name
-        } catch (e) {
-          console.error(`[auto-idle] Failed to start ${game.appId}:`, e)
+      // Wait for Steam to be fully running before starting auto-idle.
+      // On cold boot, Steam may not be ready yet even though the app
+      // launched (e.g. via Windows startup). Poll for up to 60 seconds.
+      const autoIdleGames = [...settings.autoIdleGames]
+      idleManager.waitForSteam(12, 5000).then((steamReady) => {
+        if (!steamReady) {
+          console.warn('[auto-idle] Steam not detected — skipping auto-idle')
+          showIdleNotification(
+            'Auto-Idle Skipped',
+            'Steam is not running. Auto-idle could not start.',
+            'warning',
+          )
+          return
         }
-      }
+        for (const game of autoIdleGames) {
+          try {
+            idleManager.startIdle(game.appId, game.name)
+          } catch (e) {
+            console.error(`[auto-idle] Failed to start ${game.appId}:`, e)
+          }
+        }
+      })
     }
 
     // Auto-reconnect Steam account if a refresh token is stored
@@ -515,11 +542,27 @@ app.whenReady().then(async () => {
       setTimeout(() => {
         try {
           const token = Buffer.from(settings.steamRefreshToken!, 'base64').toString('utf8')
-          steamAccountManager.loginWithRefreshToken(token).catch(e => {
-            console.warn('[steam-account] Auto-reconnect failed (will retry on next launch):', e?.message ?? e)
-          })
+          steamAccountManager.loginWithRefreshToken(token)
+            .then(() => {
+              // After successful reconnect, check for orphaned pre-idle status
+              // from a previous session that crashed while idling.
+              steamAccountManager.restoreOrphanedStatus()
+            })
+            .catch(e => {
+              console.warn('[steam-account] Auto-reconnect failed (will retry on next launch):', e?.message ?? e)
+              // Even without a CM session, try to restore orphaned status via
+              // steam:// protocol (works as long as Steam client is running).
+              // _accountId won't be set so this is a best-effort attempt.
+              steamAccountManager.restoreOrphanedStatus()
+            })
         } catch { /* ok */ }
       }, 2000)
+    } else {
+      // No steam account configured, but still check for orphaned status.
+      // This handles the edge case where the user logged out of the steam
+      // account but the app crashed before restoring status.
+      // Delayed slightly to let Steam client fully start if launching together.
+      setTimeout(() => steamAccountManager.restoreOrphanedStatus(), 3000)
     }
 
     // Mid-session reconnect: when steam-user loses its CM connection (network
@@ -575,8 +618,12 @@ export function forceQuit() {
   // Restore Steam persona state before stopping idle workers.
   // Do it FIRST (before workers exit) so Steam has time to process the
   // status change while the CM session is still alive.
+  // restoreStatus() also clears the persisted preIdleStatus from disk.
   if (idleManager.getIdlingAppIds().length > 0) {
     steamAccountManager.restoreStatus()
+  } else {
+    // Not idling, but still clean up any stale persisted status
+    try { getStore().delete('preIdleStatus') } catch { /* ok */ }
   }
   // skipRestore=true: restoreStatus() already called above
   idleManager.stopAll({ skipRestore: true })

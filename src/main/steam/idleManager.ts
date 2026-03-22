@@ -25,6 +25,19 @@ import { SteamAccountManager } from './steamUser'
 import { getStore, DEFAULT_IDLE_STATS, getIdleStatsResetting } from '../managers/store'
 import { getWorkerPath } from './workerPath'
 
+/** Check if Steam is running via Windows process list. */
+function detectSteamProcess(): Promise<boolean> {
+  return new Promise((resolve) => {
+    execFile('tasklist', ['/FI', 'IMAGENAME eq steam.exe', '/NH'], {
+      timeout: 3000,
+      windowsHide: true,
+    }, (err, stdout) => {
+      if (err) { resolve(false); return }
+      resolve(stdout.toLowerCase().includes('steam.exe'))
+    })
+  })
+}
+
 export class IdleManager extends EventEmitter {
   private idlers = new Map<number, ChildProcess>()
   private names  = new Map<number, string>()
@@ -52,6 +65,11 @@ export class IdleManager extends EventEmitter {
   // Games to resume after the manually launched game quits.
   private _resumeGames = new Map<number, string>()
   private _resumeWatchInterval: ReturnType<typeof setInterval> | null = null
+  // Steam health monitoring — detects when Steam quits or becomes unavailable.
+  private _steamHealthInterval: ReturnType<typeof setInterval> | null = null
+  private static readonly STEAM_HEALTH_POLL_MS = 15_000  // check every 15s
+  private _steamDownCount = 0
+  private static readonly STEAM_DOWN_THRESHOLD = 2  // require 2 consecutive failures
 
   private get workerPath(): string { return getWorkerPath() }
 
@@ -100,15 +118,25 @@ export class IdleManager extends EventEmitter {
       && getStore().get('settings').autoInvisibleWhenIdling
 
     if (shouldGoInvisible) {
-      // Set invisible FIRST, then wait for Steam to process the status
-      // change before spawning the worker (which shows "In-Game").
-      this.steamAccountManager!.setInvisible()
-      console.log(`[idle] Set invisible — waiting ${IdleManager.INVISIBLE_FIRST_DELAY_MS}ms before spawning worker for appId=${appId}`)
-      const timer = setTimeout(() => {
-        this._pendingSpawns.delete(appId)
-        this._spawnWorker(appId)
-      }, IdleManager.INVISIBLE_FIRST_DELAY_MS)
-      this._pendingSpawns.set(appId, timer)
+      // Set invisible FIRST, await the steam:// protocol dispatch, THEN
+      // wait for Steam to process the status change before spawning
+      // the worker (which shows "In-Game").
+      // Use a placeholder timer so isIdling() returns true immediately.
+      const placeholder = setTimeout(() => {}, 60_000)
+      this._pendingSpawns.set(appId, placeholder)
+
+      this.steamAccountManager!.setInvisible().then(() => {
+        // setInvisible resolved — now wait additional time for Steam to
+        // fully apply the invisible state before the worker advertises "In-Game"
+        clearTimeout(placeholder)
+        if (!this._pendingSpawns.has(appId)) return // cancelled while awaiting
+        console.log(`[idle] Set invisible — waiting ${IdleManager.INVISIBLE_FIRST_DELAY_MS}ms before spawning worker for appId=${appId}`)
+        const timer = setTimeout(() => {
+          this._pendingSpawns.delete(appId)
+          this._spawnWorker(appId)
+        }, IdleManager.INVISIBLE_FIRST_DELAY_MS)
+        this._pendingSpawns.set(appId, timer)
+      })
     } else {
       this._spawnWorker(appId)
     }
@@ -206,6 +234,8 @@ export class IdleManager extends EventEmitter {
     this.idlers.set(appId, proc)
     this._recordIdleStart(appId)
     console.log(`[idle] Spawned worker for appId=${appId}`)
+    // Start monitoring Steam process health when first worker spawns
+    this._startSteamHealthMonitoring()
     this.emit('changed')
   }
 
@@ -311,6 +341,7 @@ export class IdleManager extends EventEmitter {
     this._knownRunningAtStart.clear()
     this._stopGameDetectionPolling()
     this._stopResumeWatching()
+    this._stopSteamHealthMonitoring()
 
     if (opts.skipRestore) {
       // During app quit: kill processes without touching Steam persona state.
@@ -505,6 +536,7 @@ export class IdleManager extends EventEmitter {
       // Double-check: only restore if no new idle started during the delay
       if (this.idlers.size === 0 && this._pendingSpawns.size === 0 && this.steamAccountManager?.hasAccount) {
         this._stopGameDetectionPolling()
+        this._stopSteamHealthMonitoring()
         this.steamAccountManager.restoreStatus()
       }
     }, IdleManager.RESTORE_DELAY_MS)
@@ -515,5 +547,76 @@ export class IdleManager extends EventEmitter {
       clearTimeout(this._restoreTimer)
       this._restoreTimer = null
     }
+  }
+
+  // ─── Steam health monitoring ───────────────────────────────────────────────
+
+  /**
+   * Start polling to detect if Steam quits or becomes unavailable while
+   * idle workers are running. If Steam is gone for STEAM_DOWN_THRESHOLD
+   * consecutive checks (~30s), stop all idle and notify.
+   */
+  private _startSteamHealthMonitoring(): void {
+    if (process.platform !== 'win32') return
+    if (this._steamHealthInterval) return
+    this._steamDownCount = 0
+    this._steamHealthInterval = setInterval(
+      () => this._checkSteamHealth(),
+      IdleManager.STEAM_HEALTH_POLL_MS,
+    )
+  }
+
+  private _stopSteamHealthMonitoring(): void {
+    if (this._steamHealthInterval) {
+      clearInterval(this._steamHealthInterval)
+      this._steamHealthInterval = null
+    }
+    this._steamDownCount = 0
+  }
+
+  private async _checkSteamHealth(): Promise<void> {
+    if (this.idlers.size === 0 && this._pendingSpawns.size === 0) {
+      this._stopSteamHealthMonitoring()
+      return
+    }
+
+    const running = await detectSteamProcess()
+    if (running) {
+      if (this._steamDownCount > 0) {
+        console.log('[idle] Steam is back — resetting health counter')
+      }
+      this._steamDownCount = 0
+      return
+    }
+
+    this._steamDownCount++
+    console.warn(`[idle] Steam not detected (check ${this._steamDownCount}/${IdleManager.STEAM_DOWN_THRESHOLD})`)
+
+    if (this._steamDownCount >= IdleManager.STEAM_DOWN_THRESHOLD) {
+      console.error('[idle] Steam appears to have quit — stopping all idle')
+      this.emit('steam-disappeared')
+      this.stopAll()
+    }
+  }
+
+  // ─── Wait for Steam before starting idle ──────────────────────────────────
+
+  /**
+   * Wait for Steam to be running before starting idle. Retries up to
+   * maxAttempts times with pollInterval delays. Returns true if Steam
+   * was detected, false if all attempts failed.
+   */
+  async waitForSteam(maxAttempts = 12, pollInterval = 5000): Promise<boolean> {
+    for (let i = 0; i < maxAttempts; i++) {
+      const running = await detectSteamProcess()
+      if (running) {
+        if (i > 0) console.log(`[idle] Steam detected after ${i + 1} attempts`)
+        return true
+      }
+      if (i === 0) console.log('[idle] Waiting for Steam to start…')
+      await new Promise(r => setTimeout(r, pollInterval))
+    }
+    console.warn(`[idle] Steam not detected after ${maxAttempts} attempts — giving up`)
+    return false
   }
 }

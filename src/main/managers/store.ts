@@ -14,6 +14,13 @@ interface StoreSchema {
   idleStats: IdleStats
   /** @deprecated Moved to games-cache.json — kept here only so migration cleanup in client.ts can compile */
   gamesCache?: unknown
+  /**
+   * Persisted pre-idle persona state name (e.g. 'online', 'away').
+   * Written when setInvisible() is called, cleared when restoreStatus()
+   * completes. If the app crashes or PC shuts down while idling, this
+   * value survives and is used on next startup to restore the user's status.
+   */
+  preIdleStatus?: string | null
 }
 
 // Lazy singleton — created on first access, AFTER app.setPath('userData') has been called.
