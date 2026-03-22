@@ -350,9 +350,22 @@ export class SteamAccountManager extends EventEmitter {
    * Restore an orphaned pre-idle status from a previous session that
    * crashed or was killed before restoreStatus() could run.
    * Called once at startup — requires _accountId to be set.
+   *
+   * IMPORTANT: If _preIdleStateName is set, we're inside an active idle
+   * session that already called setInvisible(). In that case, the
+   * preIdleStatus in the store belongs to THIS session (just written by
+   * setInvisible()), not an orphan — so we must NOT restore it here or
+   * we'd immediately undo the invisible state.
    */
   restoreOrphanedStatus(): void {
     try {
+      // Active idle session in progress — preIdleStatus belongs to this
+      // session, not a previous orphan. Skip to avoid overriding invisible.
+      if (this._preIdleStateName) {
+        console.log('[steam-account] Skipping orphaned restore — active idle session in progress')
+        return
+      }
+
       const store = getStore()
       const orphaned = store.get('preIdleStatus')
       if (!orphaned) return

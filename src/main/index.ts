@@ -512,12 +512,46 @@ app.whenReady().then(async () => {
     // autoUpdater.removeAllListeners() doesn't clobber the splash listeners.
     setupUpdater()
 
-    if (settings.autoIdleGames?.length) {
-      // Wait for Steam to be fully running before starting auto-idle.
-      // On cold boot, Steam may not be ready yet even though the app
-      // launched (e.g. via Windows startup). Poll for up to 60 seconds.
-      const autoIdleGames = [...settings.autoIdleGames]
-      idleManager.waitForSteam(12, 5000).then((steamReady) => {
+    // ── Startup sequence: auto-reconnect + auto-idle ─────────────────────────
+    // If both a refresh token and auto-idle games are configured, we MUST
+    // complete the CM login before spawning idle workers.  This ensures
+    // hasAccount=true when startIdle() runs, so setInvisible() fires
+    // synchronously (before workers show "In-Game") rather than being
+    // applied ~2-15 s later via the status-changed listener — which caused
+    // users to briefly appear online at boot.
+    const hasRefreshToken = !!settings.steamRefreshToken
+    const hasAutoIdle     = !!settings.autoIdleGames?.length
+    const autoIdleGames   = settings.autoIdleGames ? [...settings.autoIdleGames] : []
+
+    const startAutoIdle = () => {
+      for (const game of autoIdleGames) {
+        try {
+          idleManager.startIdle(game.appId, game.name)
+        } catch (e) {
+          console.error(`[auto-idle] Failed to start ${game.appId}:`, e)
+        }
+      }
+    }
+
+    const attemptLogin = async (): Promise<void> => {
+      if (!hasRefreshToken) return
+      try {
+        const token = Buffer.from(settings.steamRefreshToken!, 'base64').toString('utf8')
+        await steamAccountManager.loginWithRefreshToken(token)
+        // restoreOrphanedStatus() is safe here: _preIdleStateName is still
+        // null because startIdle() hasn't run yet.
+        steamAccountManager.restoreOrphanedStatus()
+      } catch (e) {
+        console.warn('[steam-account] Auto-reconnect failed at startup:', (e as Error)?.message ?? e)
+        steamAccountManager.restoreOrphanedStatus()
+      }
+    }
+
+    if (hasAutoIdle) {
+      // Wait for Steam process, then login (if configured), then start idle.
+      // Order matters: login → hasAccount=true → startIdle → setInvisible
+      // fires before worker spawn.
+      idleManager.waitForSteam(12, 5000).then(async (steamReady) => {
         if (!steamReady) {
           console.warn('[auto-idle] Steam not detected — skipping auto-idle')
           showIdleNotification(
@@ -527,41 +561,17 @@ app.whenReady().then(async () => {
           )
           return
         }
-        for (const game of autoIdleGames) {
-          try {
-            idleManager.startIdle(game.appId, game.name)
-          } catch (e) {
-            console.error(`[auto-idle] Failed to start ${game.appId}:`, e)
-          }
-        }
+        await attemptLogin()
+        startAutoIdle()
       })
-    }
-
-    // Auto-reconnect Steam account if a refresh token is stored
-    if (settings.steamRefreshToken) {
-      setTimeout(() => {
-        try {
-          const token = Buffer.from(settings.steamRefreshToken!, 'base64').toString('utf8')
-          steamAccountManager.loginWithRefreshToken(token)
-            .then(() => {
-              // After successful reconnect, check for orphaned pre-idle status
-              // from a previous session that crashed while idling.
-              steamAccountManager.restoreOrphanedStatus()
-            })
-            .catch(e => {
-              console.warn('[steam-account] Auto-reconnect failed (will retry on next launch):', e?.message ?? e)
-              // Even without a CM session, try to restore orphaned status via
-              // steam:// protocol (works as long as Steam client is running).
-              // _accountId won't be set so this is a best-effort attempt.
-              steamAccountManager.restoreOrphanedStatus()
-            })
-        } catch { /* ok */ }
+    } else if (hasRefreshToken) {
+      // No auto-idle — reconnect independently with the usual 2 s delay.
+      setTimeout(async () => {
+        await attemptLogin()
       }, 2000)
     } else {
-      // No steam account configured, but still check for orphaned status.
-      // This handles the edge case where the user logged out of the steam
-      // account but the app crashed before restoring status.
-      // Delayed slightly to let Steam client fully start if launching together.
+      // No steam account configured; still try to restore any orphaned status
+      // (e.g. user logged out of account but app crashed mid-idle).
       setTimeout(() => steamAccountManager.restoreOrphanedStatus(), 3000)
     }
 
