@@ -383,6 +383,16 @@ export class SteamAccountManager extends EventEmitter {
     } catch { /* ok */ }
   }
 
+  /**
+   * Clear in-memory pre-idle state without touching disk storage.
+   * Called when Steam disappears: the in-memory state should be cleared
+   * so the next idle session captures fresh, but the disk copy is
+   * preserved for orphan recovery on restart.
+   */
+  clearPreIdleStateMemory(): void {
+    this._preIdleStateName = null
+  }
+
   // ─── Cleanup ──────────────────────────────────────────────────────────────
   destroy(): void {
     this.logout()

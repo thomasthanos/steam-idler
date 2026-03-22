@@ -18,7 +18,6 @@
  */
 
 import { ChildProcess, spawn, execFile } from 'child_process'
-import * as path from 'path'
 import { EventEmitter } from 'events'
 import treeKill from 'tree-kill'
 import { SteamAccountManager } from './steamUser'
@@ -221,6 +220,7 @@ export class IdleManager extends EventEmitter {
 
     proc.on('exit', () => {
       if (!this.idlers.has(appId)) return
+      this._recordIdleStop(appId)  // persist elapsed time before removing
       this.idlers.delete(appId)
       this.names.delete(appId)
       console.log(`[idle] Worker exited unexpectedly for appId=${appId}`)
@@ -594,8 +594,13 @@ export class IdleManager extends EventEmitter {
 
     if (this._steamDownCount >= IdleManager.STEAM_DOWN_THRESHOLD) {
       console.error('[idle] Steam appears to have quit — stopping all idle')
+      // Clear in-memory pre-idle state so next idle session captures fresh,
+      // but preserve disk state (preIdleStatus) for orphan recovery on restart.
+      this.steamAccountManager?.clearPreIdleStateMemory()
       this.emit('steam-disappeared')
-      this.stopAll()
+      // skipRestore: Steam is gone, no point sending steam:// protocol URL.
+      // preIdleStatus persists on disk for restoreOrphanedStatus() on restart.
+      this.stopAll({ skipRestore: true })
     }
   }
 
