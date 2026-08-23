@@ -44,23 +44,9 @@ For the achievements you earned emotionally but never quite managed technically.
 
 ## <img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/icon-gamepad.svg?v=14015" width="24" align="middle"> Settings
 
-| Setting | Description |
-|---|---|
-| Steam API Key | Optional - enables full library fetching |
-| Steam ID | Optional - used alongside API key |
-| Custom App IDs | Manually add game IDs not in your library |
-| Theme | Dark / Light / System |
-| Show global % | % of players who have each achievement |
-| Show hidden achievements | Reveal hidden names & descriptions |
-| Confirm bulk actions | Dialog before unlock-all / lock-all |
-| Minimize to tray | Keep app alive on close |
-| Launch on startup | Start automatically with Windows |
-| Notifications | Desktop notifications + sound toggle |
-| Auto-Idle list | Games to idle automatically on launch |
-| Auto-Invisible when idling | Switch status to Invisible while idling |
-| Stop idle on game launch | Stop all idling if a real game is launched |
-
-Settings are stored locally via `electron-store`. No cloud sync, no telemetry.
+<div align="center">
+  <img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/settings.svg?v=1" width="100%" alt="App Settings">
+</div>
 
 <br>
 
