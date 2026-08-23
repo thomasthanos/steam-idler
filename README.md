@@ -20,21 +20,9 @@ For the achievements you earned emotionally but never quite managed technically.
 
 ## <img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/icon-gamepad.svg?v=14015" width="24" align="middle"> Features
 
-- 🏆 **Achievement Manager** - unlock / lock individual achievements or all at once
-- 🔄 **Stats Reset** - reset numeric game statistics
-- 📚 **Game Library** - browse your full Steam library with playtime & achievement progress
-- 🎮 **Game Idler** - idle any game to accumulate playtime hours
-- ⚡ **Auto-Idle** - automatically idle a list of games on startup
-- 👻 **Auto-Invisible** - set Steam status to Invisible while idling, restores on stop
-- 🛑 **Game Launch Detection** - stops all idling if you launch a real Steam game
-- 🔐 **Steam Account Login** - QR code or `steamLoginSecure` cookie, auto-reconnects on launch
-- 📊 **Dashboard** - playtime stats, top played games, live "Idling Now" widget & Steam Store deals
-- 🔍 **Game Search** - search the Steam Store directly from the app
-- 🎨 **Dark / Light / System Theme** - respects your OS preference
-- 🔔 **Desktop Notifications** - instant feedback with optional sound
-- 🔽 **System Tray** - minimize to tray, manage idling from the tray menu
-- 🔄 **Auto-Updater** - silent background updates via GitHub Releases
-- 📦 **App Collection** - browse & download companion tools by Thomas Thanos
+<div align="center">
+  <img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/features.svg?v=1" width="100%" alt="Key Features">
+</div>
 
 <br>
 
