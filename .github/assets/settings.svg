@@ -1,71 +1,94 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 850 560" width="100%">
   <defs>
     <linearGradient id="setBg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#171a21" />
-      <stop offset="100%" stop-color="#1b2838" />
-    </linearGradient>
-    <linearGradient id="rowAlt" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#2a475e" stop-opacity="0.15" />
-      <stop offset="100%" stop-color="#2a475e" stop-opacity="0.05" />
+      <stop offset="0%" stop-color="#0f141c" />
+      <stop offset="100%" stop-color="#172230" />
     </linearGradient>
   </defs>
 
-  <rect width="850" height="560" rx="12" fill="url(#setBg)" stroke="#2a475e" stroke-width="1.5" />
+  <rect width="850" height="560" rx="12" fill="url(#setBg)" stroke="#223247" stroke-width="1.5" />
 
   <!-- Header -->
-  <path d="M 0 12 Q 0 0 12 0 L 838 0 Q 850 0 850 12 L 850 48 L 0 48 Z" fill="#1b2838" />
-  <circle cx="24" cy="24" r="5" fill="#66c0f4" opacity="0.8" />
-  <circle cx="40" cy="24" r="5" fill="#66c0f4" opacity="0.4" />
-  <circle cx="56" cy="24" r="5" fill="#66c0f4" opacity="0.2" />
+  <path d="M 0 12 Q 0 0 12 0 L 838 0 Q 850 0 850 12 L 850 48 L 0 48 Z" fill="#141c28" />
+  <circle cx="24" cy="24" r="5" fill="#38bdf8" />
+  <circle cx="40" cy="24" r="5" fill="#a855f7" />
+  <circle cx="56" cy="24" r="5" fill="#10b981" />
 
-  <text x="80" y="30" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="700" fill="#66c0f4" letter-spacing="1">APP SETTINGS &amp; CONFIGURATION</text>
-  <line x1="0" y1="48" x2="850" y2="48" stroke="#2a475e" stroke-width="1"/>
+  <text x="80" y="30" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="800" fill="#f8fafc" letter-spacing="1">APP CONFIGURATION &amp; PREFERENCES</text>
+  <line x1="0" y1="48" x2="850" y2="48" stroke="#223247" stroke-width="1"/>
 
   <!-- Table Header -->
-  <text x="35" y="74" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="700" fill="#8f98a0" letter-spacing="1">SETTING</text>
-  <text x="320" y="74" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="700" fill="#8f98a0" letter-spacing="1">DESCRIPTION</text>
-  <line x1="25" y1="84" x2="825" y2="84" stroke="#2a475e" stroke-width="1" stroke-dasharray="4,4"/>
+  <text x="35" y="74" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="700" fill="#64748b" letter-spacing="1">SETTING</text>
+  <text x="240" y="74" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="700" fill="#64748b" letter-spacing="1">CATEGORY</text>
+  <text x="360" y="74" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="700" fill="#64748b" letter-spacing="1">DESCRIPTION</text>
+  <line x1="25" y1="84" x2="825" y2="84" stroke="#223247" stroke-width="1" stroke-dasharray="4,4"/>
 
   <!-- Rows -->
   <g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13">
-    <text x="35" y="108" fill="#66c0f4" font-weight="600">Steam API Key</text>
-    <text x="320" y="108" fill="#c7d5e0">Optional — enables full library fetching</text>
-    <rect x="20" y="122" width="810" height="28" rx="6" fill="url(#rowAlt)" />
-    <text x="35" y="139" fill="#66c0f4" font-weight="600">Steam ID</text>
-    <text x="320" y="139" fill="#c7d5e0">Optional — used alongside API key</text>
-    <text x="35" y="170" fill="#66c0f4" font-weight="600">Custom App IDs</text>
-    <text x="320" y="170" fill="#c7d5e0">Manually add game IDs not in your library</text>
-    <rect x="20" y="184" width="810" height="28" rx="6" fill="url(#rowAlt)" />
-    <text x="35" y="201" fill="#66c0f4" font-weight="600">Theme</text>
-    <text x="320" y="201" fill="#c7d5e0">Dark / Light / System preference</text>
-    <text x="35" y="232" fill="#66c0f4" font-weight="600">Show global %</text>
-    <text x="320" y="232" fill="#c7d5e0">% of players who have each achievement</text>
-    <rect x="20" y="246" width="810" height="28" rx="6" fill="url(#rowAlt)" />
-    <text x="35" y="263" fill="#66c0f4" font-weight="600">Show hidden achievements</text>
-    <text x="320" y="263" fill="#c7d5e0">Reveal hidden names &amp; descriptions</text>
-    <text x="35" y="294" fill="#66c0f4" font-weight="600">Confirm bulk actions</text>
-    <text x="320" y="294" fill="#c7d5e0">Dialog before unlock-all / lock-all</text>
-    <rect x="20" y="308" width="810" height="28" rx="6" fill="url(#rowAlt)" />
-    <text x="35" y="325" fill="#66c0f4" font-weight="600">Minimize to tray</text>
-    <text x="320" y="325" fill="#c7d5e0">Keep app alive on close</text>
-    <text x="35" y="356" fill="#66c0f4" font-weight="600">Launch on startup</text>
-    <text x="320" y="356" fill="#c7d5e0">Start automatically with Windows</text>
-    <rect x="20" y="370" width="810" height="28" rx="6" fill="url(#rowAlt)" />
-    <text x="35" y="387" fill="#66c0f4" font-weight="600">Notifications</text>
-    <text x="320" y="387" fill="#c7d5e0">Desktop notifications + sound toggle</text>
-    <text x="35" y="418" fill="#66c0f4" font-weight="600">Auto-Idle list</text>
-    <text x="320" y="418" fill="#c7d5e0">Games to idle automatically on launch</text>
-    <rect x="20" y="432" width="810" height="28" rx="6" fill="url(#rowAlt)" />
-    <text x="35" y="449" fill="#66c0f4" font-weight="600">Auto-Invisible when idling</text>
-    <text x="320" y="449" fill="#c7d5e0">Switch status to Invisible while idling</text>
-    <text x="35" y="480" fill="#66c0f4" font-weight="600">Stop idle on game launch</text>
-    <text x="320" y="480" fill="#c7d5e0">Stop all idling if a real game is launched</text>
+    <text x="35" y="108" fill="#f1f5f9" font-weight="600">Steam API Key</text>
+    <rect x="240" y="95" width="65" height="18" rx="4" fill="#38bdf820" stroke="#38bdf850" stroke-width="1" />
+    <text x="272.5" y="108" font-size="10" font-weight="700" fill="#38bdf8" text-anchor="middle">AUTH</text>
+    <text x="360" y="108" fill="#94a3b8">Optional — enables full library fetching</text>
+    <rect x="20" y="122" width="810" height="28" rx="6" fill="#1e293b" opacity="0.4" />
+    <text x="35" y="139" fill="#f1f5f9" font-weight="600">Steam ID</text>
+    <rect x="240" y="126" width="65" height="18" rx="4" fill="#38bdf820" stroke="#38bdf850" stroke-width="1" />
+    <text x="272.5" y="139" font-size="10" font-weight="700" fill="#38bdf8" text-anchor="middle">AUTH</text>
+    <text x="360" y="139" fill="#94a3b8">Optional — used alongside API key</text>
+    <text x="35" y="170" fill="#f1f5f9" font-weight="600">Custom App IDs</text>
+    <rect x="240" y="157" width="65" height="18" rx="4" fill="#a855f720" stroke="#a855f750" stroke-width="1" />
+    <text x="272.5" y="170" font-size="10" font-weight="700" fill="#a855f7" text-anchor="middle">GAMES</text>
+    <text x="360" y="170" fill="#94a3b8">Manually add game IDs not in your library</text>
+    <rect x="20" y="184" width="810" height="28" rx="6" fill="#1e293b" opacity="0.4" />
+    <text x="35" y="201" fill="#f1f5f9" font-weight="600">Theme</text>
+    <rect x="240" y="188" width="65" height="18" rx="4" fill="#ec489920" stroke="#ec489950" stroke-width="1" />
+    <text x="272.5" y="201" font-size="10" font-weight="700" fill="#ec4899" text-anchor="middle">UI</text>
+    <text x="360" y="201" fill="#94a3b8">Dark / Light / System preference</text>
+    <text x="35" y="232" fill="#f1f5f9" font-weight="600">Show global %</text>
+    <rect x="240" y="219" width="65" height="18" rx="4" fill="#f59e0b20" stroke="#f59e0b50" stroke-width="1" />
+    <text x="272.5" y="232" font-size="10" font-weight="700" fill="#f59e0b" text-anchor="middle">STATS</text>
+    <text x="360" y="232" fill="#94a3b8">% of players who have each achievement</text>
+    <rect x="20" y="246" width="810" height="28" rx="6" fill="#1e293b" opacity="0.4" />
+    <text x="35" y="263" fill="#f1f5f9" font-weight="600">Show hidden achievements</text>
+    <rect x="240" y="250" width="65" height="18" rx="4" fill="#f59e0b20" stroke="#f59e0b50" stroke-width="1" />
+    <text x="272.5" y="263" font-size="10" font-weight="700" fill="#f59e0b" text-anchor="middle">STATS</text>
+    <text x="360" y="263" fill="#94a3b8">Reveal hidden names &amp; descriptions</text>
+    <text x="35" y="294" fill="#f1f5f9" font-weight="600">Confirm bulk actions</text>
+    <rect x="240" y="281" width="65" height="18" rx="4" fill="#ef444420" stroke="#ef444450" stroke-width="1" />
+    <text x="272.5" y="294" font-size="10" font-weight="700" fill="#ef4444" text-anchor="middle">SAFETY</text>
+    <text x="360" y="294" fill="#94a3b8">Dialog before unlock-all / lock-all</text>
+    <rect x="20" y="308" width="810" height="28" rx="6" fill="#1e293b" opacity="0.4" />
+    <text x="35" y="325" fill="#f1f5f9" font-weight="600">Minimize to tray</text>
+    <rect x="240" y="312" width="65" height="18" rx="4" fill="#6366f120" stroke="#6366f150" stroke-width="1" />
+    <text x="272.5" y="325" font-size="10" font-weight="700" fill="#6366f1" text-anchor="middle">SYSTEM</text>
+    <text x="360" y="325" fill="#94a3b8">Keep app alive on close</text>
+    <text x="35" y="356" fill="#f1f5f9" font-weight="600">Launch on startup</text>
+    <rect x="240" y="343" width="65" height="18" rx="4" fill="#6366f120" stroke="#6366f150" stroke-width="1" />
+    <text x="272.5" y="356" font-size="10" font-weight="700" fill="#6366f1" text-anchor="middle">SYSTEM</text>
+    <text x="360" y="356" fill="#94a3b8">Start automatically with Windows</text>
+    <rect x="20" y="370" width="810" height="28" rx="6" fill="#1e293b" opacity="0.4" />
+    <text x="35" y="387" fill="#f1f5f9" font-weight="600">Notifications</text>
+    <rect x="240" y="374" width="65" height="18" rx="4" fill="#eab30820" stroke="#eab30850" stroke-width="1" />
+    <text x="272.5" y="387" font-size="10" font-weight="700" fill="#eab308" text-anchor="middle">ALERT</text>
+    <text x="360" y="387" fill="#94a3b8">Desktop notifications + sound toggle</text>
+    <text x="35" y="418" fill="#f1f5f9" font-weight="600">Auto-Idle list</text>
+    <rect x="240" y="405" width="65" height="18" rx="4" fill="#10b98120" stroke="#10b98150" stroke-width="1" />
+    <text x="272.5" y="418" font-size="10" font-weight="700" fill="#10b981" text-anchor="middle">IDLER</text>
+    <text x="360" y="418" fill="#94a3b8">Games to idle automatically on launch</text>
+    <rect x="20" y="432" width="810" height="28" rx="6" fill="#1e293b" opacity="0.4" />
+    <text x="35" y="449" fill="#f1f5f9" font-weight="600">Auto-Invisible when idling</text>
+    <rect x="240" y="436" width="65" height="18" rx="4" fill="#14b8a620" stroke="#14b8a650" stroke-width="1" />
+    <text x="272.5" y="449" font-size="10" font-weight="700" fill="#14b8a6" text-anchor="middle">STEALTH</text>
+    <text x="360" y="449" fill="#94a3b8">Switch status to Invisible while idling</text>
+    <text x="35" y="480" fill="#f1f5f9" font-weight="600">Stop idle on game launch</text>
+    <rect x="240" y="467" width="65" height="18" rx="4" fill="#ef444420" stroke="#ef444450" stroke-width="1" />
+    <text x="272.5" y="480" font-size="10" font-weight="700" fill="#ef4444" text-anchor="middle">SAFETY</text>
+    <text x="360" y="480" fill="#94a3b8">Stop all idling if a real game is launched</text>
 
   </g>
 
   <!-- Footer Banner -->
-  <rect x="20" y="505" width="810" height="38" rx="8" fill="#171a21" stroke="#2a475e" stroke-width="1" />
-  <text x="425" y="529" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="500" fill="#8f98a0" text-anchor="middle">
-    🔒 Stored locally via <tspan fill="#66c0f4" font-family="monospace">electron-store</tspan> • Zero telemetry • 100% offline config
+  <rect x="20" y="505" width="810" height="38" rx="8" fill="#131b26" stroke="#223247" stroke-width="1" />
+  <text x="425" y="529" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="500" fill="#94a3b8" text-anchor="middle">
+    🔒 Stored locally via <tspan fill="#38bdf8" font-family="monospace">electron-store</tspan> • <tspan fill="#10b981">Zero telemetry</tspan> • 100% offline configuration
   </text>
 </svg>

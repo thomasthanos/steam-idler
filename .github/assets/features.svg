@@ -1,91 +1,155 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 850 560" width="100%">
   <defs>
     <linearGradient id="featBg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#171a21" />
-      <stop offset="100%" stop-color="#1b2838" />
-    </linearGradient>
-    <linearGradient id="cardBg" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#2a475e" stop-opacity="0.25" />
-      <stop offset="100%" stop-color="#1b2838" stop-opacity="0.4" />
+      <stop offset="0%" stop-color="#0f141c" />
+      <stop offset="100%" stop-color="#172230" />
     </linearGradient>
   </defs>
 
-  <rect width="850" height="560" rx="12" fill="url(#featBg)" stroke="#2a475e" stroke-width="1.5" />
+  <rect width="850" height="560" rx="12" fill="url(#featBg)" stroke="#223247" stroke-width="1.5" />
 
   <!-- Header -->
-  <path d="M 0 12 Q 0 0 12 0 L 838 0 Q 850 0 850 12 L 850 48 L 0 48 Z" fill="#1b2838" />
-  <circle cx="24" cy="24" r="5" fill="#66c0f4" opacity="0.8" />
-  <circle cx="40" cy="24" r="5" fill="#66c0f4" opacity="0.4" />
-  <circle cx="56" cy="24" r="5" fill="#66c0f4" opacity="0.2" />
+  <path d="M 0 12 Q 0 0 12 0 L 838 0 Q 850 0 850 12 L 850 48 L 0 48 Z" fill="#141c28" />
+  <circle cx="24" cy="24" r="5" fill="#f59e0b" />
+  <circle cx="40" cy="24" r="5" fill="#38bdf8" />
+  <circle cx="56" cy="24" r="5" fill="#a855f7" />
 
-  <text x="80" y="30" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="700" fill="#66c0f4" letter-spacing="1">KEY FEATURES &amp; CAPABILITIES</text>
-  <line x1="0" y1="48" x2="850" y2="48" stroke="#2a475e" stroke-width="1"/>
+  <text x="80" y="30" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="800" fill="#f8fafc" letter-spacing="1">KEY FEATURES &amp; CAPABILITIES</text>
+  
+  <rect x="680" y="14" width="145" height="22" rx="11" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+  <text x="752" y="29" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" font-weight="700" fill="#38bdf8" text-anchor="middle">16 DEDICATED MODULES</text>
+
+  <line x1="0" y1="48" x2="850" y2="48" stroke="#223247" stroke-width="1"/>
 
   <g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">
-    <rect x="20" y="62" width="395" height="54" rx="8" fill="url(#cardBg)" stroke="#2a475e" stroke-width="1" />
-    <text x="34" y="84" font-size="16">🏆</text>
-    <text x="60" y="84" font-size="13" font-weight="700" fill="#66c0f4">Achievement Manager</text>
-    <text x="60" y="102" font-size="11" fill="#8f98a0">Unlock or lock achievements individually or all at once</text>
-    <rect x="20" y="122" width="395" height="54" rx="8" fill="url(#cardBg)" stroke="#2a475e" stroke-width="1" />
-    <text x="34" y="144" font-size="16">🔄</text>
-    <text x="60" y="144" font-size="13" font-weight="700" fill="#66c0f4">Stats Reset</text>
-    <text x="60" y="162" font-size="11" fill="#8f98a0">Reset numeric game statistics with a single click</text>
-    <rect x="20" y="182" width="395" height="54" rx="8" fill="url(#cardBg)" stroke="#2a475e" stroke-width="1" />
-    <text x="34" y="204" font-size="16">📚</text>
-    <text x="60" y="204" font-size="13" font-weight="700" fill="#66c0f4">Game Library</text>
-    <text x="60" y="222" font-size="11" fill="#8f98a0">Browse full Steam library with playtime &amp; progress</text>
-    <rect x="20" y="242" width="395" height="54" rx="8" fill="url(#cardBg)" stroke="#2a475e" stroke-width="1" />
-    <text x="34" y="264" font-size="16">🎮</text>
-    <text x="60" y="264" font-size="13" font-weight="700" fill="#66c0f4">Game Idler</text>
-    <text x="60" y="282" font-size="11" fill="#8f98a0">Idle any game in the background to accumulate hours</text>
-    <rect x="20" y="302" width="395" height="54" rx="8" fill="url(#cardBg)" stroke="#2a475e" stroke-width="1" />
-    <text x="34" y="324" font-size="16">⚡</text>
-    <text x="60" y="324" font-size="13" font-weight="700" fill="#66c0f4">Auto-Idle</text>
-    <text x="60" y="342" font-size="11" fill="#8f98a0">Automatically launch idler for selected games on startup</text>
-    <rect x="20" y="362" width="395" height="54" rx="8" fill="url(#cardBg)" stroke="#2a475e" stroke-width="1" />
-    <text x="34" y="384" font-size="16">👻</text>
-    <text x="60" y="384" font-size="13" font-weight="700" fill="#66c0f4">Auto-Invisible</text>
-    <text x="60" y="402" font-size="11" fill="#8f98a0">Set Steam status to Invisible while idling, auto-restores</text>
-    <rect x="20" y="422" width="395" height="54" rx="8" fill="url(#cardBg)" stroke="#2a475e" stroke-width="1" />
-    <text x="34" y="444" font-size="16">🛑</text>
-    <text x="60" y="444" font-size="13" font-weight="700" fill="#66c0f4">Launch Detection</text>
-    <text x="60" y="462" font-size="11" fill="#8f98a0">Stops all idling tasks immediately if a real game starts</text>
-    <rect x="20" y="482" width="395" height="54" rx="8" fill="url(#cardBg)" stroke="#2a475e" stroke-width="1" />
-    <text x="34" y="504" font-size="16">🔐</text>
-    <text x="60" y="504" font-size="13" font-weight="700" fill="#66c0f4">Steam Account Login</text>
-    <text x="60" y="522" font-size="11" fill="#8f98a0">QR code or steamLoginSecure cookie with auto-reconnect</text>
-    <rect x="435" y="62" width="395" height="54" rx="8" fill="url(#cardBg)" stroke="#2a475e" stroke-width="1" />
-    <text x="449" y="84" font-size="16">📊</text>
-    <text x="475" y="84" font-size="13" font-weight="700" fill="#66c0f4">Live Dashboard</text>
-    <text x="475" y="102" font-size="11" fill="#8f98a0">Playtime stats, top played games &amp; Steam Store deals</text>
-    <rect x="435" y="122" width="395" height="54" rx="8" fill="url(#cardBg)" stroke="#2a475e" stroke-width="1" />
-    <text x="449" y="144" font-size="16">🔍</text>
-    <text x="475" y="144" font-size="13" font-weight="700" fill="#66c0f4">Game Search</text>
-    <text x="475" y="162" font-size="11" fill="#8f98a0">Search and inspect games in Steam Store from within app</text>
-    <rect x="435" y="182" width="395" height="54" rx="8" fill="url(#cardBg)" stroke="#2a475e" stroke-width="1" />
-    <text x="449" y="204" font-size="16">🎨</text>
-    <text x="475" y="204" font-size="13" font-weight="700" fill="#66c0f4">Dark / Light / System</text>
-    <text x="475" y="222" font-size="11" fill="#8f98a0">Sleek UI adhering to your native OS theme preference</text>
-    <rect x="435" y="242" width="395" height="54" rx="8" fill="url(#cardBg)" stroke="#2a475e" stroke-width="1" />
-    <text x="449" y="264" font-size="16">🔔</text>
-    <text x="475" y="264" font-size="13" font-weight="700" fill="#66c0f4">Desktop Notifications</text>
-    <text x="475" y="282" font-size="11" fill="#8f98a0">Instant toast feedback with optional sound effects</text>
-    <rect x="435" y="302" width="395" height="54" rx="8" fill="url(#cardBg)" stroke="#2a475e" stroke-width="1" />
-    <text x="449" y="324" font-size="16">🔽</text>
-    <text x="475" y="324" font-size="13" font-weight="700" fill="#66c0f4">System Tray</text>
-    <text x="475" y="342" font-size="11" fill="#8f98a0">Minimize to background tray and manage idling on the fly</text>
-    <rect x="435" y="362" width="395" height="54" rx="8" fill="url(#cardBg)" stroke="#2a475e" stroke-width="1" />
-    <text x="449" y="384" font-size="16">🔄</text>
-    <text x="475" y="384" font-size="13" font-weight="700" fill="#66c0f4">Silent Auto-Updater</text>
-    <text x="475" y="402" font-size="11" fill="#8f98a0">Automatic background update flow via GitHub Releases</text>
-    <rect x="435" y="422" width="395" height="54" rx="8" fill="url(#cardBg)" stroke="#2a475e" stroke-width="1" />
-    <text x="449" y="444" font-size="16">📦</text>
-    <text x="475" y="444" font-size="13" font-weight="700" fill="#66c0f4">App Collection</text>
-    <text x="475" y="462" font-size="11" fill="#8f98a0">Browse &amp; access companion tools by Thomas Thanos</text>
-    <rect x="435" y="482" width="395" height="54" rx="8" fill="url(#cardBg)" stroke="#2a475e" stroke-width="1" />
-    <text x="449" y="504" font-size="16">🛡️</text>
-    <text x="475" y="504" font-size="13" font-weight="700" fill="#66c0f4">100% Offline &amp; Private</text>
-    <text x="475" y="522" font-size="11" fill="#8f98a0">No cloud sync, zero telemetry, local electron-store</text>
+    <!-- Card: Achievement Manager -->
+    <rect x="20" y="62" width="395" height="54" rx="8" fill="#131b26" stroke="#223247" stroke-width="1" />
+    <rect x="20" y="62" width="4" height="54" rx="2" fill="#f59e0b" />
+    <text x="36" y="85" font-size="16">🏆</text>
+    <text x="64" y="84" font-size="13" font-weight="700" fill="#f1f5f9">Achievement Manager</text>
+    <rect x="367" y="72" width="38" height="16" rx="4" fill="#f59e0b22" stroke="#f59e0b55" stroke-width="1" />
+    <text x="386" y="84" font-size="9" font-weight="700" fill="#f59e0b" text-anchor="middle">CORE</text>
+    <text x="64" y="102" font-size="11" fill="#94a3b8">Unlock or lock achievements instantly</text>
+    <!-- Card: Stats Reset -->
+    <rect x="20" y="122" width="395" height="54" rx="8" fill="#131b26" stroke="#223247" stroke-width="1" />
+    <rect x="20" y="122" width="4" height="54" rx="2" fill="#f59e0b" />
+    <text x="36" y="145" font-size="16">🔄</text>
+    <text x="64" y="144" font-size="13" font-weight="700" fill="#f1f5f9">Stats Reset</text>
+    <rect x="367" y="132" width="38" height="16" rx="4" fill="#f59e0b22" stroke="#f59e0b55" stroke-width="1" />
+    <text x="386" y="144" font-size="9" font-weight="700" fill="#f59e0b" text-anchor="middle">CORE</text>
+    <text x="64" y="162" font-size="11" fill="#94a3b8">Reset numeric stats with safe confirmation</text>
+    <!-- Card: Game Library -->
+    <rect x="20" y="182" width="395" height="54" rx="8" fill="#131b26" stroke="#223247" stroke-width="1" />
+    <rect x="20" y="182" width="4" height="54" rx="2" fill="#38bdf8" />
+    <text x="36" y="205" font-size="16">📚</text>
+    <text x="64" y="204" font-size="13" font-weight="700" fill="#f1f5f9">Game Library</text>
+    <rect x="360.5" y="192" width="44.5" height="16" rx="4" fill="#38bdf822" stroke="#38bdf855" stroke-width="1" />
+    <text x="382.75" y="204" font-size="9" font-weight="700" fill="#38bdf8" text-anchor="middle">STEAM</text>
+    <text x="64" y="222" font-size="11" fill="#94a3b8">Full Steam library with playtime &amp; progress</text>
+    <!-- Card: Game Idler -->
+    <rect x="20" y="242" width="395" height="54" rx="8" fill="#131b26" stroke="#223247" stroke-width="1" />
+    <rect x="20" y="242" width="4" height="54" rx="2" fill="#a855f7" />
+    <text x="36" y="265" font-size="16">🎮</text>
+    <text x="64" y="264" font-size="13" font-weight="700" fill="#f1f5f9">Game Idler</text>
+    <rect x="360.5" y="252" width="44.5" height="16" rx="4" fill="#a855f722" stroke="#a855f755" stroke-width="1" />
+    <text x="382.75" y="264" font-size="9" font-weight="700" fill="#a855f7" text-anchor="middle">IDLER</text>
+    <text x="64" y="282" font-size="11" fill="#94a3b8">Idle multiple games in background</text>
+    <!-- Card: Auto-Idle on Boot -->
+    <rect x="20" y="302" width="395" height="54" rx="8" fill="#131b26" stroke="#223247" stroke-width="1" />
+    <rect x="20" y="302" width="4" height="54" rx="2" fill="#a855f7" />
+    <text x="36" y="325" font-size="16">⚡</text>
+    <text x="64" y="324" font-size="13" font-weight="700" fill="#f1f5f9">Auto-Idle on Boot</text>
+    <rect x="360.5" y="312" width="44.5" height="16" rx="4" fill="#a855f722" stroke="#a855f755" stroke-width="1" />
+    <text x="382.75" y="324" font-size="9" font-weight="700" fill="#a855f7" text-anchor="middle">IDLER</text>
+    <text x="64" y="342" font-size="11" fill="#94a3b8">Automatically start idling selected games</text>
+    <!-- Card: Auto-Invisible Mode -->
+    <rect x="20" y="362" width="395" height="54" rx="8" fill="#131b26" stroke="#223247" stroke-width="1" />
+    <rect x="20" y="362" width="4" height="54" rx="2" fill="#10b981" />
+    <text x="36" y="385" font-size="16">👻</text>
+    <text x="64" y="384" font-size="13" font-weight="700" fill="#f1f5f9">Auto-Invisible Mode</text>
+    <rect x="347.5" y="372" width="57.5" height="16" rx="4" fill="#10b98122" stroke="#10b98155" stroke-width="1" />
+    <text x="376.25" y="384" font-size="9" font-weight="700" fill="#10b981" text-anchor="middle">STEALTH</text>
+    <text x="64" y="402" font-size="11" fill="#94a3b8">Stealth status while idling, auto-restores</text>
+    <!-- Card: Real Game Detection -->
+    <rect x="20" y="422" width="395" height="54" rx="8" fill="#131b26" stroke="#223247" stroke-width="1" />
+    <rect x="20" y="422" width="4" height="54" rx="2" fill="#ef4444" />
+    <text x="36" y="445" font-size="16">🛑</text>
+    <text x="64" y="444" font-size="13" font-weight="700" fill="#f1f5f9">Real Game Detection</text>
+    <rect x="347.5" y="432" width="57.5" height="16" rx="4" fill="#ef444422" stroke="#ef444455" stroke-width="1" />
+    <text x="376.25" y="444" font-size="9" font-weight="700" fill="#ef4444" text-anchor="middle">STEALTH</text>
+    <text x="64" y="462" font-size="11" fill="#94a3b8">Stops idle tasks when real game launches</text>
+    <!-- Card: Account Login -->
+    <rect x="20" y="482" width="395" height="54" rx="8" fill="#131b26" stroke="#223247" stroke-width="1" />
+    <rect x="20" y="482" width="4" height="54" rx="2" fill="#06b6d4" />
+    <text x="36" y="505" font-size="16">🔐</text>
+    <text x="64" y="504" font-size="13" font-weight="700" fill="#f1f5f9">Account Login</text>
+    <rect x="367" y="492" width="38" height="16" rx="4" fill="#06b6d422" stroke="#06b6d455" stroke-width="1" />
+    <text x="386" y="504" font-size="9" font-weight="700" fill="#06b6d4" text-anchor="middle">AUTH</text>
+    <text x="64" y="522" font-size="11" fill="#94a3b8">QR code or cookie login with auto-reconnect</text>
+    <!-- Card: Live Dashboard -->
+    <rect x="435" y="62" width="395" height="54" rx="8" fill="#131b26" stroke="#223247" stroke-width="1" />
+    <rect x="435" y="62" width="4" height="54" rx="2" fill="#f97316" />
+    <text x="451" y="85" font-size="16">📊</text>
+    <text x="479" y="84" font-size="13" font-weight="700" fill="#f1f5f9">Live Dashboard</text>
+    <rect x="795" y="72" width="25" height="16" rx="4" fill="#f9731622" stroke="#f9731655" stroke-width="1" />
+    <text x="807.5" y="84" font-size="9" font-weight="700" fill="#f97316" text-anchor="middle">UI</text>
+    <text x="479" y="102" font-size="11" fill="#94a3b8">Playtime graphs, stats &amp; Steam specials</text>
+    <!-- Card: Game Search -->
+    <rect x="435" y="122" width="395" height="54" rx="8" fill="#131b26" stroke="#223247" stroke-width="1" />
+    <rect x="435" y="122" width="4" height="54" rx="2" fill="#38bdf8" />
+    <text x="451" y="145" font-size="16">🔍</text>
+    <text x="479" y="144" font-size="13" font-weight="700" fill="#f1f5f9">Game Search</text>
+    <rect x="775.5" y="132" width="44.5" height="16" rx="4" fill="#38bdf822" stroke="#38bdf855" stroke-width="1" />
+    <text x="797.75" y="144" font-size="9" font-weight="700" fill="#38bdf8" text-anchor="middle">STORE</text>
+    <text x="479" y="162" font-size="11" fill="#94a3b8">Direct Steam Store search &amp; app lookup</text>
+    <!-- Card: Theme Engine -->
+    <rect x="435" y="182" width="395" height="54" rx="8" fill="#131b26" stroke="#223247" stroke-width="1" />
+    <rect x="435" y="182" width="4" height="54" rx="2" fill="#ec4899" />
+    <text x="451" y="205" font-size="16">🎨</text>
+    <text x="479" y="204" font-size="13" font-weight="700" fill="#f1f5f9">Theme Engine</text>
+    <rect x="795" y="192" width="25" height="16" rx="4" fill="#ec489922" stroke="#ec489955" stroke-width="1" />
+    <text x="807.5" y="204" font-size="9" font-weight="700" fill="#ec4899" text-anchor="middle">UI</text>
+    <text x="479" y="222" font-size="11" fill="#94a3b8">Dark, Light, and System OS preference</text>
+    <!-- Card: Desktop Toasts -->
+    <rect x="435" y="242" width="395" height="54" rx="8" fill="#131b26" stroke="#223247" stroke-width="1" />
+    <rect x="435" y="242" width="4" height="54" rx="2" fill="#eab308" />
+    <text x="451" y="265" font-size="16">🔔</text>
+    <text x="479" y="264" font-size="13" font-weight="700" fill="#f1f5f9">Desktop Toasts</text>
+    <rect x="769" y="252" width="51" height="16" rx="4" fill="#eab30822" stroke="#eab30855" stroke-width="1" />
+    <text x="794.5" y="264" font-size="9" font-weight="700" fill="#eab308" text-anchor="middle">SYSTEM</text>
+    <text x="479" y="282" font-size="11" fill="#94a3b8">Notification banners with audio feedback</text>
+    <!-- Card: System Tray Hub -->
+    <rect x="435" y="302" width="395" height="54" rx="8" fill="#131b26" stroke="#223247" stroke-width="1" />
+    <rect x="435" y="302" width="4" height="54" rx="2" fill="#6366f1" />
+    <text x="451" y="325" font-size="16">🔽</text>
+    <text x="479" y="324" font-size="13" font-weight="700" fill="#f1f5f9">System Tray Hub</text>
+    <rect x="769" y="312" width="51" height="16" rx="4" fill="#6366f122" stroke="#6366f155" stroke-width="1" />
+    <text x="794.5" y="324" font-size="9" font-weight="700" fill="#6366f1" text-anchor="middle">SYSTEM</text>
+    <text x="479" y="342" font-size="11" fill="#94a3b8">Full idle controls from Windows tray menu</text>
+    <!-- Card: Silent Updater -->
+    <rect x="435" y="362" width="395" height="54" rx="8" fill="#131b26" stroke="#223247" stroke-width="1" />
+    <rect x="435" y="362" width="4" height="54" rx="2" fill="#14b8a6" />
+    <text x="451" y="385" font-size="16">🔄</text>
+    <text x="479" y="384" font-size="13" font-weight="700" fill="#f1f5f9">Silent Updater</text>
+    <rect x="782" y="372" width="38" height="16" rx="4" fill="#14b8a622" stroke="#14b8a655" stroke-width="1" />
+    <text x="801" y="384" font-size="9" font-weight="700" fill="#14b8a6" text-anchor="middle">AUTO</text>
+    <text x="479" y="402" font-size="11" fill="#94a3b8">Automatic background update releases</text>
+    <!-- Card: App Collection -->
+    <rect x="435" y="422" width="395" height="54" rx="8" fill="#131b26" stroke="#223247" stroke-width="1" />
+    <rect x="435" y="422" width="4" height="54" rx="2" fill="#f43f5e" />
+    <text x="451" y="445" font-size="16">📦</text>
+    <text x="479" y="444" font-size="13" font-weight="700" fill="#f1f5f9">App Collection</text>
+    <rect x="788.5" y="432" width="31.5" height="16" rx="4" fill="#f43f5e22" stroke="#f43f5e55" stroke-width="1" />
+    <text x="804.25" y="444" font-size="9" font-weight="700" fill="#f43f5e" text-anchor="middle">HUB</text>
+    <text x="479" y="462" font-size="11" fill="#94a3b8">Integrated tools hub by Thomas Thanos</text>
+    <!-- Card: Zero Telemetry -->
+    <rect x="435" y="482" width="395" height="54" rx="8" fill="#131b26" stroke="#223247" stroke-width="1" />
+    <rect x="435" y="482" width="4" height="54" rx="2" fill="#10b981" />
+    <text x="451" y="505" font-size="16">🛡️</text>
+    <text x="479" y="504" font-size="13" font-weight="700" fill="#f1f5f9">Zero Telemetry</text>
+    <rect x="762.5" y="492" width="57.5" height="16" rx="4" fill="#10b98122" stroke="#10b98155" stroke-width="1" />
+    <text x="791.25" y="504" font-size="9" font-weight="700" fill="#10b981" text-anchor="middle">PRIVACY</text>
+    <text x="479" y="522" font-size="11" fill="#94a3b8">100% offline, local electron-store config</text>
 
   </g>
 </svg>
