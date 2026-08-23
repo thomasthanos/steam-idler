@@ -30,7 +30,7 @@ const bannerSVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 200"
   <text x="400" y="150" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="400" fill="#c7d5e0" text-anchor="middle" letter-spacing="1">STEAM ACHIEVEMENT MANAGER &amp; GAME IDLER</text>
 </svg>`;
 
-fs.writeFileSync(path.join(outDir, 'banner.svg'), bannerSVG);
+fs.writeFileSync(path.join(outDir, 'hero-banner.svg'), bannerSVG);
 
 // 2. Tree SVG
 const treeLines = [
@@ -99,5 +99,5 @@ treeSvgContent += `
   </g>
 </svg>`;
 
-fs.writeFileSync(path.join(outDir, 'tree.svg'), treeSvgContent);
-console.log('tree.svg and fixed banner.svg generated!');
+fs.writeFileSync(path.join(outDir, 'structure.svg'), treeSvgContent);
+console.log('structure.svg and fixed hero-banner.svg generated!');
