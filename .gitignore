@@ -1,7 +1,43 @@
-/node_modules
-/release
+node_modules/
+dist/
+dist-electron/
+release/
+build/
+out/
 *.exe
-/dist
-/.claude
+*.dmg
+*.AppImage
+*.zip
+*.tar.gz
+*.asar
+
+# Local env files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Misc
+.claude
 RELEASE_NOTES.md
-/node_modules

@@ -1,50 +1,53 @@
-# Souvlatzidiko Unlocker
+<div align="center">
 
-A modern Steam Achievement Manager & Game Idler built with **Electron**, **React 18**, and **TypeScript**.
+<img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/banner.svg?v=1" alt="Souvlatzidiko Unlocker">
 
----
+[![React 18](https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/badge-react.svg?v=1)](#)
+[![TypeScript](https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/badge-ts.svg?v=1)](#)
+[![Electron](https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/badge-electron.svg?v=1)](#)
+[![Proprietary License](https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/badge-license.svg?v=1)](#-license)
 
-## ✨ Features
+<br>
 
-- 🏆 **Achievement Manager** — unlock / lock individual achievements or all at once
-- 📊 **Stats Reset** — reset numeric game statistics
-- 🎮 **Game Library** — browse your full Steam library with playtime & achievement progress
-- ⚡ **Game Idler** — idle any game to accumulate playtime hours
-- 🔄 **Auto-Idle** — automatically idle a list of games on startup
-- 👁️ **Auto-Invisible** — set Steam status to Invisible while idling, restores on stop
-- 🛑 **Game Launch Detection** — stops all idling if you launch a real Steam game
-- 🔑 **Steam Account Login** — QR code or `steamLoginSecure` cookie, auto-reconnects on launch
-- 🏠 **Dashboard** — playtime stats, top played games, live "Idling Now" widget & Steam Store deals
-- 🔍 **Game Search** — search the Steam Store directly from the app
-- 🌙 **Dark / Light / System Theme** — respects your OS preference
-- 🔔 **Desktop Notifications** — instant feedback with optional sound
-- 🗂️ **System Tray** — minimize to tray, manage idling from the tray menu
-- 🚀 **Auto-Updater** — silent background updates via GitHub Releases
-- 📦 **App Collection** — browse & download companion tools by ThomasThanos
+A modern Steam Achievement Manager & Game Idler built with **Electron**, **React 18**, and **TypeScript**. 
+For the achievements you earned emotionally but never quite managed technically.
 
----
+<br>
 
-## 🚀 Getting Started
+<img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/divider.svg?v=1" alt="Divider">
 
-**Prerequisites:** Node.js ≥ 18, npm ≥ 9, Steam running & logged in.
+</div>
 
-> `steamworks.js` is a native addon — Steam must be running before Electron starts.
+## <img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/icon-gamepad.svg?v=1" width="24" align="middle"> Features
 
-```bash
-npm install
-npm run dev        # development (HMR)
-npm run build      # compile only
-npm run release    # build + installer (output: release/)
-```
+- 🏆 **Achievement Manager** - unlock / lock individual achievements or all at once
+- 🔄 **Stats Reset** - reset numeric game statistics
+- 📚 **Game Library** - browse your full Steam library with playtime & achievement progress
+- 🎮 **Game Idler** - idle any game to accumulate playtime hours
+- ⚡ **Auto-Idle** - automatically idle a list of games on startup
+- 👻 **Auto-Invisible** - set Steam status to Invisible while idling, restores on stop
+- 🛑 **Game Launch Detection** - stops all idling if you launch a real Steam game
+- 🔐 **Steam Account Login** - QR code or `steamLoginSecure` cookie, auto-reconnects on launch
+- 📊 **Dashboard** - playtime stats, top played games, live "Idling Now" widget & Steam Store deals
+- 🔍 **Game Search** - search the Steam Store directly from the app
+- 🎨 **Dark / Light / System Theme** - respects your OS preference
+- 🔔 **Desktop Notifications** - instant feedback with optional sound
+- 🔽 **System Tray** - minimize to tray, manage idling from the tray menu
+- 🔄 **Auto-Updater** - silent background updates via GitHub Releases
+- 📦 **App Collection** - browse & download companion tools by Thomas Thanos
 
----
+<br>
 
-## ⚙️ Settings
+<div align="center">
+  <img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/divider.svg?v=1" alt="Divider">
+</div>
+
+## <img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/icon-gamepad.svg?v=1" width="24" align="middle"> Settings
 
 | Setting | Description |
 |---|---|
-| Steam API Key | Optional — enables full library fetching |
-| Steam ID | Optional — used alongside API key |
+| Steam API Key | Optional - enables full library fetching |
+| Steam ID | Optional - used alongside API key |
 | Custom App IDs | Manually add game IDs not in your library |
 | Theme | Dark / Light / System |
 | Show global % | % of players who have each achievement |
@@ -59,21 +62,29 @@ npm run release    # build + installer (output: release/)
 
 Settings are stored locally via `electron-store`. No cloud sync, no telemetry.
 
----
+<br>
 
-## 🔑 Steam Account (Auto-Invisible)
+<div align="center">
+  <img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/divider.svg?v=1" alt="Divider">
+</div>
+
+## <img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/icon-gamepad.svg?v=1" width="24" align="middle"> Steam Account (Auto-Invisible)
 
 Optional login to enable automatic status management:
 
-- **QR Code** — scan with the Steam mobile app
-- **Cookie** — paste your `steamLoginSecure` cookie (`steamId||<jwt>` format supported)
+- **QR Code** - scan with the Steam mobile app
+- **Cookie** - paste your `steamLoginSecure` cookie (`steamId||<jwt>` format supported)
 - Refresh token is saved (base64-obfuscated) and used for auto-reconnect on next launch
-- Status changes use the `steam://friends/status/` protocol — no CM traffic, no session conflicts
+- Status changes use the `steam://friends/status/` protocol - no CM traffic, no session conflicts
 - Current persona state is read from `localconfig.vdf` before switching to Invisible, then restored on stop
 
----
+<br>
 
-## 📁 Project Structure
+<div align="center">
+  <img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/divider.svg?v=1" alt="Divider">
+</div>
+
+## <img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/icon-gamepad.svg?v=1" width="24" align="middle"> Project Structure
 
 ```
 src/
@@ -98,8 +109,25 @@ src/
 └── shared/types.ts         # Shared types, IPC channels & default settings
 ```
 
----
+<br>
 
-## ⚠️ Disclaimer
+<div align="center">
+  <img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/divider.svg?v=1" alt="Divider">
+</div>
+
+## <img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/icon-gamepad.svg?v=1" width="24" align="middle"> Disclaimer
 
 Modifying Steam achievements may violate the [Steam Subscriber Agreement](https://store.steampowered.com/subscriber_agreement/). Use at your own risk. Not affiliated with or endorsed by Valve Corporation.
+
+<br>
+
+## License
+
+This project is proprietary.
+© 2026 **Thomas Thanos**. All rights reserved.
+
+<div align="center">
+
+[![Thomas Thanos](https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/footer-author.svg?v=1)](#)
+
+</div>
