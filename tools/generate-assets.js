@@ -6,7 +6,7 @@ if (!fs.existsSync(outDir)) {
     fs.mkdirSync(outDir, { recursive: true });
 }
 
-// 1. Fix Banner
+// 1. Banner
 const bannerSVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 200" width="100%">
   <defs>
     <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -56,13 +56,13 @@ const treeLines = [
 ];
 
 let treeSvgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 850 560" width="100%">
-  <rect width="850" height="560" rx="10" fill="#1e1f22" />
+  <rect width="850" height="560" rx="12" fill="#1e1f22" stroke="#2a475e" stroke-width="1.5" />
   
   <circle cx="20" cy="20" r="6" fill="#ff5f56" />
   <circle cx="40" cy="20" r="6" fill="#ffbd2e" />
   <circle cx="60" cy="20" r="6" fill="#27c93f" />
   
-  <text x="425" y="24" font-family="-apple-system, sans-serif" font-size="12" fill="#8b949e" text-anchor="middle">Project Structure</text>
+  <text x="425" y="24" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="700" fill="#8b949e" text-anchor="middle" letter-spacing="1">PROJECT DIRECTORY STRUCTURE</text>
   <line x1="0" y1="40" x2="850" y2="40" stroke="#313338" stroke-width="2"/>
 
   <g font-family="Consolas, Monaco, 'Courier New', monospace" font-size="14">
@@ -223,7 +223,6 @@ let featuresSvgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8
   <g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">
 `;
 
-// Render Left Column
 let featY = 62;
 leftFeatures.forEach((item) => {
   featuresSvgContent += `    <rect x="20" y="${featY}" width="395" height="54" rx="8" fill="url(#cardBg)" stroke="#2a475e" stroke-width="1" />\n`;
@@ -233,7 +232,6 @@ leftFeatures.forEach((item) => {
   featY += 60;
 });
 
-// Render Right Column
 featY = 62;
 rightFeatures.forEach((item) => {
   featuresSvgContent += `    <rect x="435" y="${featY}" width="395" height="54" rx="8" fill="url(#cardBg)" stroke="#2a475e" stroke-width="1" />\n`;
@@ -249,4 +247,74 @@ featuresSvgContent += `
 
 fs.writeFileSync(path.join(outDir, 'features.svg'), featuresSvgContent);
 
-console.log('All SVGs generated successfully!');
+// 5. Steam Account / Auth Flow SVG
+const authSteps = [
+  { icon: '📱', title: 'QR Code Mobile Auth', desc: 'Instant authentication by scanning QR with Steam Mobile App.' },
+  { icon: '🍪', title: 'Cookie Fallback', desc: 'Paste steamLoginSecure cookie with automatic token parsing.' },
+  { icon: '🔒', title: 'Local Session Token', desc: 'Base64-obfuscated persistence with silent reconnect on boot.' },
+  { icon: '👻', title: 'Auto-Invisible Protocol', desc: 'Switches status via native steam://friends protocol without CM noise.' }
+];
+
+let authSvgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 850 300" width="100%">
+  <defs>
+    <linearGradient id="authBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#171a21" />
+      <stop offset="100%" stop-color="#1b2838" />
+    </linearGradient>
+    <linearGradient id="stepBg" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#2a475e" stop-opacity="0.3" />
+      <stop offset="100%" stop-color="#1b2838" stop-opacity="0.5" />
+    </linearGradient>
+  </defs>
+
+  <rect width="850" height="300" rx="12" fill="url(#authBg)" stroke="#2a475e" stroke-width="1.5" />
+
+  <!-- Header -->
+  <path d="M 0 12 Q 0 0 12 0 L 838 0 Q 850 0 850 12 L 850 48 L 0 48 Z" fill="#1b2838" />
+  <circle cx="24" cy="24" r="5" fill="#66c0f4" opacity="0.8" />
+  <circle cx="40" cy="24" r="5" fill="#66c0f4" opacity="0.4" />
+  <circle cx="56" cy="24" r="5" fill="#66c0f4" opacity="0.2" />
+
+  <text x="80" y="30" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="700" fill="#66c0f4" letter-spacing="1">STEAM ACCOUNT &amp; AUTO-INVISIBLE PROTOCOL</text>
+  <line x1="0" y1="48" x2="850" y2="48" stroke="#2a475e" stroke-width="1"/>
+
+  <!-- 4 Step Cards (2x2 grid) -->
+  <g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">
+    <!-- Card 1 -->
+    <rect x="20" y="65" width="395" height="85" rx="8" fill="url(#stepBg)" stroke="#2a475e" stroke-width="1" />
+    <text x="36" y="96" font-size="20">📱</text>
+    <text x="68" y="94" font-size="13" font-weight="700" fill="#66c0f4">QR Code Mobile Auth</text>
+    <text x="68" y="115" font-size="11" fill="#c7d5e0">Instant login by scanning with official Steam App</text>
+    <text x="68" y="132" font-size="11" fill="#8f98a0">Zero password entry required</text>
+
+    <!-- Card 2 -->
+    <rect x="435" y="65" width="395" height="85" rx="8" fill="url(#stepBg)" stroke="#2a475e" stroke-width="1" />
+    <text x="451" y="96" font-size="20">🍪</text>
+    <text x="483" y="94" font-size="13" font-weight="700" fill="#66c0f4">Cookie Fallback Option</text>
+    <text x="483" y="115" font-size="11" fill="#c7d5e0">Paste steamLoginSecure with auto JWT parsing</text>
+    <text x="483" y="132" font-size="11" fill="#8f98a0">Supports steamId||&lt;jwt&gt; format</text>
+
+    <!-- Card 3 -->
+    <rect x="20" y="160" width="395" height="85" rx="8" fill="url(#stepBg)" stroke="#2a475e" stroke-width="1" />
+    <text x="36" y="191" font-size="20">🔒</text>
+    <text x="68" y="189" font-size="13" font-weight="700" fill="#66c0f4">Local Session Token</text>
+    <text x="68" y="210" font-size="11" fill="#c7d5e0">Base64-obfuscated refresh token storage</text>
+    <text x="68" y="227" font-size="11" fill="#8f98a0">Silent auto-reconnect on next application launch</text>
+
+    <!-- Card 4 -->
+    <rect x="435" y="160" width="395" height="85" rx="8" fill="url(#stepBg)" stroke="#2a475e" stroke-width="1" />
+    <text x="451" y="191" font-size="20">👻</text>
+    <text x="483" y="189" font-size="13" font-weight="700" fill="#66c0f4">Auto-Invisible Protocol</text>
+    <text x="483" y="210" font-size="11" fill="#c7d5e0">Native steam://friends protocol switching</text>
+    <text x="483" y="227" font-size="11" fill="#8f98a0">Zero CM traffic • Restores state from localconfig.vdf</text>
+  </g>
+
+  <!-- Footer Info -->
+  <text x="425" y="278" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="500" fill="#8f98a0" text-anchor="middle">
+    💡 Status changes operate entirely client-side without interfering with active gaming sessions.
+  </text>
+</svg>`;
+
+fs.writeFileSync(path.join(outDir, 'auth-flow.svg'), authSvgContent);
+
+console.log('All 5 SVGs generated successfully!');
