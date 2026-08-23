@@ -1,11 +1,11 @@
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/banner.svg?v=9834" alt="Souvlatzidiko Unlocker">
+<img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/banner.svg?v=22662" alt="Souvlatzidiko Unlocker">
 
-[![React 18](https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/badge-react.svg?v=1)](#)
-[![TypeScript](https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/badge-ts.svg?v=1)](#)
-[![Electron](https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/badge-electron.svg?v=1)](#)
-[![Proprietary License](https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/badge-license.svg?v=1)](#-license)
+[![React 18](https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/badge-react.svg?v=22662)](#)
+[![TypeScript](https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/badge-ts.svg?v=22662)](#)
+[![Electron](https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/badge-electron.svg?v=22662)](#)
+[![Proprietary License](https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/badge-license.svg?v=22662)](#-license)
 
 <br>
 
@@ -14,11 +14,11 @@ For the achievements you earned emotionally but never quite managed technically.
 
 <br>
 
-<img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/divider.svg?v=1" alt="Divider">
+<img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/divider.svg?v=22662" alt="Divider">
 
 </div>
 
-## <img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/icon-gamepad.svg?v=1" width="24" align="middle"> Features
+## <img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/icon-gamepad.svg?v=22662" width="24" align="middle"> Features
 
 - 🏆 **Achievement Manager** - unlock / lock individual achievements or all at once
 - 🔄 **Stats Reset** - reset numeric game statistics
@@ -39,10 +39,10 @@ For the achievements you earned emotionally but never quite managed technically.
 <br>
 
 <div align="center">
-  <img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/divider.svg?v=1" alt="Divider">
+  <img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/divider.svg?v=22662" alt="Divider">
 </div>
 
-## <img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/icon-gamepad.svg?v=1" width="24" align="middle"> Settings
+## <img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/icon-gamepad.svg?v=22662" width="24" align="middle"> Settings
 
 | Setting | Description |
 |---|---|
@@ -65,10 +65,10 @@ Settings are stored locally via `electron-store`. No cloud sync, no telemetry.
 <br>
 
 <div align="center">
-  <img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/divider.svg?v=1" alt="Divider">
+  <img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/divider.svg?v=22662" alt="Divider">
 </div>
 
-## <img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/icon-gamepad.svg?v=1" width="24" align="middle"> Steam Account (Auto-Invisible)
+## <img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/icon-gamepad.svg?v=22662" width="24" align="middle"> Steam Account (Auto-Invisible)
 
 Optional login to enable automatic status management:
 
@@ -81,22 +81,22 @@ Optional login to enable automatic status management:
 <br>
 
 <div align="center">
-  <img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/divider.svg?v=1" alt="Divider">
+  <img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/divider.svg?v=22662" alt="Divider">
 </div>
 
-## <img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/icon-gamepad.svg?v=1" width="24" align="middle"> Project Structure
+## <img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/icon-gamepad.svg?v=22662" width="24" align="middle"> Project Structure
 
 <div align="center">
-  <img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/tree.svg?v=9834" width="100%" alt="Project Structure">
+  <img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/tree.svg?v=22662" width="100%" alt="Project Structure">
 </div>
 
 <br>
 
 <div align="center">
-  <img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/divider.svg?v=1" alt="Divider">
+  <img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/divider.svg?v=22662" alt="Divider">
 </div>
 
-## <img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/icon-gamepad.svg?v=1" width="24" align="middle"> Disclaimer
+## <img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/icon-gamepad.svg?v=22662" width="24" align="middle"> Disclaimer
 
 Modifying Steam achievements may violate the [Steam Subscriber Agreement](https://store.steampowered.com/subscriber_agreement/). Use at your own risk. Not affiliated with or endorsed by Valve Corporation.
 
@@ -109,6 +109,6 @@ This project is proprietary.
 
 <div align="center">
 
-[![Thomas Thanos](https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/footer-author.svg?v=1)](#)
+[![Thomas Thanos](https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/footer-author.svg?v=22662)](#)
 
 </div>
