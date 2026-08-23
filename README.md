@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/banner.svg?v=980" alt="Souvlatzidiko Unlocker">
+<img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/banner.svg?v=9834" alt="Souvlatzidiko Unlocker">
 
 [![React 18](https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/badge-react.svg?v=1)](#)
 [![TypeScript](https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/badge-ts.svg?v=1)](#)
@@ -87,7 +87,7 @@ Optional login to enable automatic status management:
 ## <img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/icon-gamepad.svg?v=1" width="24" align="middle"> Project Structure
 
 <div align="center">
-  <img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/tree.svg?v=980" width="100%" alt="Project Structure">
+  <img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/tree.svg?v=9834" width="100%" alt="Project Structure">
 </div>
 
 <br>
