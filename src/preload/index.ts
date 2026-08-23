@@ -1,0 +1,193 @@
+import { contextBridge, ipcRenderer } from 'electron'
+import { IPC, IPCResponse, AppSettings, Achievement, SteamGame, SteamUser, SteamAccountStatusInfo, QrLoginEvent } from '../shared/types'
+
+// ─── Exposed API ──────────────────────────────────────────────────────────────
+const steamAPI = {
+  // Steam status
+  checkSteamRunning: (): Promise<IPCResponse<boolean>> =>
+    ipcRenderer.invoke(IPC.CHECK_STEAM_RUNNING),
+
+  getUserInfo: (): Promise<IPCResponse<SteamUser>> =>
+    ipcRenderer.invoke(IPC.GET_USER_INFO),
+
+  // Games
+  getOwnedGames: (force?: boolean): Promise<IPCResponse<SteamGame[]>> =>
+    ipcRenderer.invoke(IPC.GET_OWNED_GAMES, force),
+
+  getRecentGames: (): Promise<IPCResponse<SteamGame[]>> =>
+    ipcRenderer.invoke(IPC.GET_RECENT_GAMES),
+
+  // Achievements
+  getAchievements: (appId: number): Promise<IPCResponse<Achievement[]>> =>
+    ipcRenderer.invoke(IPC.GET_ACHIEVEMENTS, appId),
+
+  unlockAchievement: (appId: number, apiName: string): Promise<IPCResponse<{ verified?: boolean; expected?: boolean }>> =>
+    ipcRenderer.invoke(IPC.UNLOCK_ACHIEVEMENT, appId, apiName),
+
+  lockAchievement: (appId: number, apiName: string): Promise<IPCResponse<{ verified?: boolean; expected?: boolean }>> =>
+    ipcRenderer.invoke(IPC.LOCK_ACHIEVEMENT, appId, apiName),
+
+  unlockAllAchievements: (appId: number): Promise<IPCResponse<void>> =>
+    ipcRenderer.invoke(IPC.UNLOCK_ALL_ACHIEVEMENTS, appId),
+
+  lockAllAchievements: (appId: number): Promise<IPCResponse<void>> =>
+    ipcRenderer.invoke(IPC.LOCK_ALL_ACHIEVEMENTS, appId),
+
+  resetStats: (appId: number): Promise<IPCResponse<void>> =>
+    ipcRenderer.invoke(IPC.RESET_STATS, appId),
+
+  // Settings
+  getSettings: (): Promise<IPCResponse<AppSettings>> =>
+    ipcRenderer.invoke(IPC.GET_SETTINGS),
+
+  setSettings: (settings: Partial<AppSettings>): Promise<IPCResponse<void>> =>
+    ipcRenderer.invoke(IPC.SET_SETTINGS, settings),
+
+  // Idle
+  startIdle: (appId: number, name: string): Promise<IPCResponse<number[]>> =>
+    ipcRenderer.invoke(IPC.IDLE_START, appId, name),
+
+  stopIdle: (appId: number): Promise<IPCResponse<number[]>> =>
+    ipcRenderer.invoke(IPC.IDLE_STOP, appId),
+
+  getIdleStatus: (): Promise<IPCResponse<number[]>> =>
+    ipcRenderer.invoke(IPC.IDLE_STATUS),
+
+  getIdleStats: (): Promise<IPCResponse<import('../shared/types').IdleStats>> =>
+    ipcRenderer.invoke(IPC.GET_IDLE_STATS),
+
+  resetIdleStats: (): Promise<IPCResponse<void>> =>
+    ipcRenderer.invoke(IPC.RESET_IDLE_STATS),
+
+  /** Returns epoch-ms start times keyed by appId for all currently-idling games. */
+  getIdleStartTimes: (): Promise<IPCResponse<Record<number, number>>> =>
+    ipcRenderer.invoke(IPC.IDLE_GET_START_TIMES),
+
+  /** Returns idling games with their names as stored by the idle manager. */
+  getIdlingGames: (): Promise<IPCResponse<{ appId: number; name: string }[]>> =>
+    ipcRenderer.invoke(IPC.IDLE_GET_GAMES),
+
+  onIdleChanged: (cb: () => void) => {
+    ipcRenderer.on('idle:changed', cb)
+    return () => ipcRenderer.removeListener('idle:changed', cb)
+  },
+
+  onIdleWarning: (cb: (data: { type: string; appId?: number }) => void) => {
+    const handler = (_: unknown, data: { type: string; appId?: number }) => cb(data)
+    ipcRenderer.on('idle:warning', handler)
+    return () => { ipcRenderer.removeListener('idle:warning', handler) }
+  },
+
+  // Steam Store
+  getSteamFeatured: (): Promise<IPCResponse<{ deals: any[]; featured: any[]; freeGames: any[] }>> =>
+    ipcRenderer.invoke(IPC.GET_STEAM_FEATURED),
+
+  resolveAppName: (appId: number): Promise<IPCResponse<{ name: string }>> =>
+    ipcRenderer.invoke(IPC.RESOLVE_APP_NAME, appId),
+
+  searchGames: (term: string): Promise<IPCResponse<Array<{
+    appId: number; name: string; headerImageUrl: string; tiny_image?: string; price?: any
+  }>>> =>
+    ipcRenderer.invoke(IPC.SEARCH_GAMES, term),
+
+  // Worker control
+  // Pass appId so the main process only kills the worker if it's still
+  // running *that* game — preventing a delayed cleanup from a previously-viewed
+  // game from killing the worker that was just spawned for the next game.
+  stopGame: (appId?: number): Promise<IPCResponse<void>> =>
+    ipcRenderer.invoke(IPC.STOP_GAME, appId),
+
+  // Auto-updater
+  checkForUpdates: (): Promise<IPCResponse<void>> =>
+    ipcRenderer.invoke(IPC.UPDATER_CHECK),
+  restartAndInstall: (): void => {
+    ipcRenderer.invoke(IPC.UPDATER_RESTART).catch(() => {})
+  },
+  onUpdaterStatus: (cb: (state: import('../shared/types').UpdaterState) => void) => {
+    const handler = (_: unknown, state: import('../shared/types').UpdaterState) => cb(state)
+    ipcRenderer.on(IPC.UPDATER_STATUS, handler)
+    return () => ipcRenderer.removeListener(IPC.UPDATER_STATUS, handler)
+  },
+
+  // Notifications
+  sendNotification: (title: string, body: string, silent: boolean): Promise<IPCResponse<void>> =>
+    ipcRenderer.invoke(IPC.SEND_NOTIFICATION, title, body, silent),
+
+  // Autostart
+  getAutostart: (): Promise<IPCResponse<boolean>> =>
+    ipcRenderer.invoke(IPC.AUTOSTART_GET),
+
+  setAutostart: (enabled: boolean): Promise<IPCResponse<boolean>> =>
+    ipcRenderer.invoke(IPC.AUTOSTART_SET, enabled),
+
+  // Partner apps
+  getPartnerAppReleases: (): Promise<IPCResponse<import('../shared/types').PartnerAppRelease[]>> =>
+    ipcRenderer.invoke(IPC.GET_PARTNER_APP_RELEASES),
+
+  downloadPartnerApp: (key: string, url: string, fileName: string): Promise<IPCResponse<void>> =>
+    ipcRenderer.invoke(IPC.DOWNLOAD_PARTNER_APP, key, url, fileName),
+
+  onPartnerAppDownloadProgress: (cb: (p: import('../shared/types').PartnerAppDownloadProgress) => void) => {
+    const handler = (_: unknown, p: import('../shared/types').PartnerAppDownloadProgress) => cb(p)
+    ipcRenderer.on(IPC.PARTNER_APP_DOWNLOAD_PROGRESS, handler)
+    return () => ipcRenderer.removeListener(IPC.PARTNER_APP_DOWNLOAD_PROGRESS, handler)
+  },
+
+  // Steam Account (auto-invisible)
+  steamAccountStatus: (): Promise<IPCResponse<SteamAccountStatusInfo>> =>
+    ipcRenderer.invoke(IPC.STEAM_ACCOUNT_STATUS),
+
+  steamAccountLogout: (): Promise<IPCResponse<void>> =>
+    ipcRenderer.invoke(IPC.STEAM_ACCOUNT_LOGOUT),
+
+  steamAccountSetInvisible: (): Promise<IPCResponse<void>> =>
+    ipcRenderer.invoke(IPC.STEAM_ACCOUNT_SET_INVISIBLE),
+
+  // QR code login
+  steamAccountQrStart: (): Promise<IPCResponse<void>> =>
+    ipcRenderer.invoke(IPC.STEAM_ACCOUNT_QR_START),
+
+  steamAccountQrCancel: (): Promise<IPCResponse<void>> =>
+    ipcRenderer.invoke(IPC.STEAM_ACCOUNT_QR_CANCEL),
+
+  onSteamAccountQrEvent: (cb: (evt: QrLoginEvent) => void) => {
+    const handler = (_: unknown, evt: QrLoginEvent) => cb(evt)
+    ipcRenderer.on(IPC.STEAM_ACCOUNT_QR_EVENT, handler)
+    return () => ipcRenderer.removeListener(IPC.STEAM_ACCOUNT_QR_EVENT, handler)
+  },
+
+  // Cookie / refresh-token login
+  steamAccountTokenLogin: (token: string): Promise<IPCResponse<SteamAccountStatusInfo>> =>
+    ipcRenderer.invoke(IPC.STEAM_ACCOUNT_TOKEN_LOGIN, token),
+
+  onSteamAccountStatusChanged: (cb: (info: SteamAccountStatusInfo) => void) => {
+    const handler = (_: unknown, info: SteamAccountStatusInfo) => cb(info)
+    ipcRenderer.on(IPC.STEAM_ACCOUNT_STATUS_CHANGED, handler)
+    return () => ipcRenderer.removeListener(IPC.STEAM_ACCOUNT_STATUS_CHANGED, handler)
+  },
+
+  // Silent image probe (via main process — no CORS, no 404 console errors)
+  probeImage: (url: string): Promise<boolean> =>
+    ipcRenderer.invoke('image:probe', url).then((r: any) => r?.data ?? false),
+
+  // Theme listener
+  onThemeChange: (cb: (theme: 'dark' | 'light') => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, theme: 'dark' | 'light') => cb(theme)
+    ipcRenderer.on('theme:changed', handler)
+    // Use removeListener (not removeAllListeners) so multiple subscribers can coexist
+    return () => ipcRenderer.removeListener('theme:changed', handler)
+  },
+}
+
+const windowAPI = {
+  minimize: () => ipcRenderer.send(IPC.MINIMIZE_WINDOW),
+  maximize: () => ipcRenderer.send(IPC.MAXIMIZE_WINDOW),
+  close: () => ipcRenderer.send(IPC.CLOSE_WINDOW),
+}
+
+contextBridge.exposeInMainWorld('steam', steamAPI)
+contextBridge.exposeInMainWorld('windowAPI', windowAPI)
+
+// ─── Type augmentation for renderer ──────────────────────────────────────────
+export type SteamAPI = typeof steamAPI
+export type WindowAPI = typeof windowAPI

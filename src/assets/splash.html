@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Loading…</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #0a0a0b;
+      color: #e5e5e5;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      user-select: none;
+      -webkit-app-region: drag;
+      overflow: hidden;
+    }
+
+    /* ── Logo row ── */
+    .logo-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .logo-icon {
+      width: 32px;
+      height: 32px;
+      /* Steam-style circle gradient as fallback if no img */
+      background: linear-gradient(135deg, #1a9fff 0%, #1b6ed6 100%);
+      border-radius: 50%;
+    }
+    .logo-text {
+      font-size: 17px;
+      font-weight: 600;
+      color: #ffffff;
+      letter-spacing: 0.3px;
+    }
+
+    /* ── Spinner ── */
+    .spinner {
+      width: 22px;
+      height: 22px;
+      border: 2.5px solid #1e1e24;
+      border-top-color: #4f8ef7;
+      border-radius: 50%;
+      animation: spin 0.75s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Status text ── */
+    .status {
+      font-size: 13px;
+      color: #666;
+      min-height: 18px;
+      text-align: center;
+      transition: color 0.3s;
+    }
+    .status.success { color: #4ade80; }
+    .status.error   { color: #f87171; }
+
+    /* ── Progress bar ── */
+    .bar-wrap {
+      width: 260px;
+      height: 3px;
+      background: #1e1e24;
+      border-radius: 3px;
+      overflow: hidden;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .bar-wrap.visible { opacity: 1; }
+    .bar {
+      height: 100%;
+      background: linear-gradient(90deg, #4f8ef7, #7ab4ff);
+      border-radius: 3px;
+      width: 0%;
+      transition: width 0.25s ease;
+    }
+
+    /* ── Version tag ── */
+    .version {
+      position: absolute;
+      bottom: 10px;
+      right: 14px;
+      font-size: 10px;
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+  <div class="spinner" id="spinner"></div>
+  <div class="logo-row">
+    <div class="logo-text">Souvlatzidiko-Unlocker</div>
+  </div>
+  <div class="status" id="status">Checking for updates…</div>
+  <div class="bar-wrap" id="barWrap"><div class="bar" id="bar"></div></div>
+  <div class="version" id="ver"></div>
+
+  <script>
+    window._setStatus = function(text, cls) {
+      const el = document.getElementById('status');
+      el.textContent = text;
+      el.className = 'status' + (cls ? ' ' + cls : '');
+    };
+    window._setProgress = function(pct) {
+      const wrap = document.getElementById('barWrap');
+      const bar  = document.getElementById('bar');
+      wrap.classList.add('visible');
+      bar.style.width = pct + '%';
+    };
+    window._hideSpinner = function() {
+      document.getElementById('spinner').style.display = 'none';
+    };
+    window._setVersion = function(v) {
+      document.getElementById('ver').textContent = v ? 'v' + v : '';
+    };
+  </script>
+</body>
+</html>

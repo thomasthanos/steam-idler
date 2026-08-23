@@ -1,0 +1,7 @@
+/node_modules
+/release
+*.exe
+/dist
+/.claude
+RELEASE_NOTES.md
+/node_modules
