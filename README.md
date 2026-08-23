@@ -25,14 +25,7 @@ For the achievements you earned emotionally but never quite managed technically.
 
 <img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/divider.svg?v=13763" alt="Divider">
 
-<br>
 
-<!-- App Settings -->
-<img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/settings.svg?v=13763" width="100%" alt="App Settings">
-
-<br><br>
-
-<img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/divider.svg?v=13763" alt="Divider">
 
 <br>
 
