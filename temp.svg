@@ -27,7 +27,7 @@
     <text x="25" y="273" xml:space="preserve"><tspan fill="#484f58">│   │   ├── </tspan><tspan fill="#c7d5e0" font-weight="normal">worker.ts</tspan></text>
     <text x="400" y="273" fill="#8b949e" font-style="italic">// Child process: steamworks idle worker</text>
     <text x="25" y="295" xml:space="preserve"><tspan fill="#484f58">│   │   ├── </tspan><tspan fill="#c7d5e0" font-weight="normal">steamPaths.ts</tspan></text>
-    <text x="400" y="295" fill="#8b949e" font-style="italic">// Steam install path &amp; VDF helpers</text>
+    <text x="400" y="295" fill="#8b949e" font-style="italic">// Steam install path & VDF helpers</text>
     <text x="25" y="317" xml:space="preserve"><tspan fill="#484f58">│   │   └── </tspan><tspan fill="#c7d5e0" font-weight="normal">steamUser.ts</tspan></text>
     <text x="400" y="317" fill="#8b949e" font-style="italic">// Account manager (QR/cookie login)</text>
     <text x="25" y="339" xml:space="preserve"><tspan fill="#484f58">│   └── </tspan><tspan fill="#c7d5e0" font-weight="normal">ipc/handlers.ts</tspan></text>
@@ -43,7 +43,7 @@
     <text x="400" y="449" fill="#8b949e" font-style="italic">// useAppContext, useTheme, useUpdater</text>
     <text x="25" y="471" xml:space="preserve"><tspan fill="#484f58">│   └── </tspan><tspan fill="#c7d5e0" font-weight="normal">styles/global.css</tspan></text>
     <text x="25" y="493" xml:space="preserve"><tspan fill="#484f58">└── </tspan><tspan fill="#c7d5e0" font-weight="normal">shared/types.ts</tspan></text>
-    <text x="400" y="493" fill="#8b949e" font-style="italic">// Shared types, IPC channels &amp; default settings</text>
+    <text x="400" y="493" fill="#8b949e" font-style="italic">// Shared types, IPC channels & default settings</text>
 
   </g>
 </svg>

@@ -86,10 +86,10 @@ for (const line of treeLines) {
   let nameColor = line.type === 'folder' || line.type === 'root' ? '#66c0f4' : '#c7d5e0';
   if (line.type === 'root') nameColor = '#ff7b72'; 
   
-  treeSvgContent += `    <text x="25" y="${y}" xml:space="preserve"><tspan fill="#484f58">${prefix}</tspan><tspan fill="${nameColor}" font-weight="${line.type === 'folder' ? 'bold' : 'normal'}">${name.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</tspan></text>\n`;
+  treeSvgContent += `    <text x="25" y="${y}" xml:space="preserve"><tspan fill="#484f58">${prefix}</tspan><tspan fill="${nameColor}" font-weight="${line.type === 'folder' ? 'bold' : 'normal'}">${name.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</tspan></text>\n`;
   
-  if (line.comment) {
-    treeSvgContent += `    <text x="400" y="${y}" fill="#8b949e" font-style="italic">// ${line.comment}</text>\n`;
+  if (line.comment.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')) {
+    treeSvgContent += `    <text x="400" y="${y}" fill="#8b949e" font-style="italic">// ${line.comment.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</text>\n`;
   }
   
   y += 22;
