@@ -24,7 +24,6 @@ const bannerSVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 200"
   </defs>
   <rect width="800" height="200" rx="15" fill="url(#bg)" />
   <g filter="url(#glow)">
-    <!-- Reduced font-size from 56 to 46 to fit SOUVLATZIDIKO UNLOCKER -->
     <text x="400" y="110" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="38" font-weight="900" fill="#66c0f4" text-anchor="middle" letter-spacing="2">SOUVLATZIDIKO UNLOCKER</text>
   </g>
   <text x="400" y="150" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="400" fill="#c7d5e0" text-anchor="middle" letter-spacing="1">STEAM ACHIEVEMENT MANAGER &amp; GAME IDLER</text>
@@ -88,7 +87,7 @@ for (const line of treeLines) {
   
   treeSvgContent += `    <text x="25" y="${y}" xml:space="preserve"><tspan fill="#484f58">${prefix}</tspan><tspan fill="${nameColor}" font-weight="${line.type === 'folder' ? 'bold' : 'normal'}">${name.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</tspan></text>\n`;
   
-  if (line.comment.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')) {
+  if (line.comment) {
     treeSvgContent += `    <text x="400" y="${y}" fill="#8b949e" font-style="italic">// ${line.comment.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</text>\n`;
   }
   
@@ -100,4 +99,78 @@ treeSvgContent += `
 </svg>`;
 
 fs.writeFileSync(path.join(outDir, 'structure.svg'), treeSvgContent);
-console.log('structure.svg and fixed hero-banner.svg generated!');
+
+// 3. Settings SVG
+const settingsList = [
+  { key: 'Steam API Key', desc: 'Optional — enables full library fetching' },
+  { key: 'Steam ID', desc: 'Optional — used alongside API key' },
+  { key: 'Custom App IDs', desc: 'Manually add game IDs not in your library' },
+  { key: 'Theme', desc: 'Dark / Light / System preference' },
+  { key: 'Show global %', desc: '% of players who have each achievement' },
+  { key: 'Show hidden achievements', desc: 'Reveal hidden names & descriptions' },
+  { key: 'Confirm bulk actions', desc: 'Dialog before unlock-all / lock-all' },
+  { key: 'Minimize to tray', desc: 'Keep app alive on close' },
+  { key: 'Launch on startup', desc: 'Start automatically with Windows' },
+  { key: 'Notifications', desc: 'Desktop notifications + sound toggle' },
+  { key: 'Auto-Idle list', desc: 'Games to idle automatically on launch' },
+  { key: 'Auto-Invisible when idling', desc: 'Switch status to Invisible while idling' },
+  { key: 'Stop idle on game launch', desc: 'Stop all idling if a real game is launched' }
+];
+
+let settingsSvgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 850 560" width="100%">
+  <defs>
+    <linearGradient id="setBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#171a21" />
+      <stop offset="100%" stop-color="#1b2838" />
+    </linearGradient>
+    <linearGradient id="rowAlt" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#2a475e" stop-opacity="0.15" />
+      <stop offset="100%" stop-color="#2a475e" stop-opacity="0.05" />
+    </linearGradient>
+  </defs>
+
+  <rect width="850" height="560" rx="12" fill="url(#setBg)" stroke="#2a475e" stroke-width="1.5" />
+
+  <!-- Header -->
+  <path d="M 0 12 Q 0 0 12 0 L 838 0 Q 850 0 850 12 L 850 48 L 0 48 Z" fill="#1b2838" />
+  <circle cx="24" cy="24" r="5" fill="#66c0f4" opacity="0.8" />
+  <circle cx="40" cy="24" r="5" fill="#66c0f4" opacity="0.4" />
+  <circle cx="56" cy="24" r="5" fill="#66c0f4" opacity="0.2" />
+
+  <text x="80" y="30" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="700" fill="#66c0f4" letter-spacing="1">APP SETTINGS &amp; CONFIGURATION</text>
+  <line x1="0" y1="48" x2="850" y2="48" stroke="#2a475e" stroke-width="1"/>
+
+  <!-- Table Header -->
+  <text x="35" y="74" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="700" fill="#8f98a0" letter-spacing="1">SETTING</text>
+  <text x="320" y="74" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="700" fill="#8f98a0" letter-spacing="1">DESCRIPTION</text>
+  <line x1="25" y1="84" x2="825" y2="84" stroke="#2a475e" stroke-width="1" stroke-dasharray="4,4"/>
+
+  <!-- Rows -->
+  <g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13">
+`;
+
+let setY = 108;
+settingsList.forEach((item, index) => {
+  if (index % 2 === 1) {
+    settingsSvgContent += `    <rect x="20" y="${setY - 17}" width="810" height="28" rx="6" fill="url(#rowAlt)" />\n`;
+  }
+  const cleanKey = item.key.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const cleanDesc = item.desc.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  settingsSvgContent += `    <text x="35" y="${setY}" fill="#66c0f4" font-weight="600">${cleanKey}</text>\n`;
+  settingsSvgContent += `    <text x="320" y="${setY}" fill="#c7d5e0">${cleanDesc}</text>\n`;
+  setY += 31;
+});
+
+settingsSvgContent += `
+  </g>
+
+  <!-- Footer Banner -->
+  <rect x="20" y="505" width="810" height="38" rx="8" fill="#171a21" stroke="#2a475e" stroke-width="1" />
+  <text x="425" y="529" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="500" fill="#8f98a0" text-anchor="middle">
+    🔒 Stored locally via <tspan fill="#66c0f4" font-family="monospace">electron-store</tspan> • Zero telemetry • 100% offline config
+  </text>
+</svg>`;
+
+fs.writeFileSync(path.join(outDir, 'settings.svg'), settingsSvgContent);
+console.log('hero-banner.svg, structure.svg and settings.svg generated!');
