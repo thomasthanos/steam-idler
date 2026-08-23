@@ -1,11 +1,11 @@
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/hero-banner.svg?v=2001" alt="Souvlatzidiko Unlocker">
+<img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/hero-banner.svg?v=13763" alt="Souvlatzidiko Unlocker">
 
-[![React 18](https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/badge-react.svg?v=2001)](#)
-[![TypeScript](https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/badge-ts.svg?v=2001)](#)
-[![Electron](https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/badge-electron.svg?v=2001)](#)
-[![Proprietary License](https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/badge-license.svg?v=2001)](#-license)
+[![React 18](https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/badge-react.svg?v=13763)](#)
+[![TypeScript](https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/badge-ts.svg?v=13763)](#)
+[![Electron](https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/badge-electron.svg?v=13763)](#)
+[![Proprietary License](https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/badge-license.svg?v=13763)](#-license)
 
 <br>
 
@@ -14,43 +14,43 @@ For the achievements you earned emotionally but never quite managed technically.
 
 <br>
 
-<img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/divider.svg?v=2001" alt="Divider">
+<img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/divider.svg?v=13763" alt="Divider">
 
 <br>
 
 <!-- Key Features -->
-<img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/features.svg?v=2001" width="100%" alt="Key Features">
+<img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/features.svg?v=13763" width="100%" alt="Key Features">
 
 <br><br>
 
-<img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/divider.svg?v=2001" alt="Divider">
+<img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/divider.svg?v=13763" alt="Divider">
 
 <br>
 
 <!-- App Settings -->
-<img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/settings.svg?v=2001" width="100%" alt="App Settings">
+<img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/settings.svg?v=13763" width="100%" alt="App Settings">
 
 <br><br>
 
-<img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/divider.svg?v=2001" alt="Divider">
+<img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/divider.svg?v=13763" alt="Divider">
 
 <br>
 
 <!-- Steam Account & Invisible Protocol -->
-<img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/auth-flow.svg?v=2001" width="100%" alt="Steam Account Protocol">
+<img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/auth-flow.svg?v=13763" width="100%" alt="Steam Account Protocol">
 
 <br><br>
 
-<img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/divider.svg?v=2001" alt="Divider">
+<img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/divider.svg?v=13763" alt="Divider">
 
 <br>
 
 <!-- Project Structure -->
-<img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/structure.svg?v=2001" width="100%" alt="Project Structure">
+<img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/structure.svg?v=13763" width="100%" alt="Project Structure">
 
 <br><br>
 
-<img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/divider.svg?v=2001" alt="Divider">
+<img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/divider.svg?v=13763" alt="Divider">
 
 </div>
 
@@ -70,6 +70,6 @@ This project is proprietary.
 
 <div align="center">
 
-[![Thomas Thanos](https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/footer-author.svg?v=2001)](#)
+[![Thomas Thanos](https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/footer-author.svg?v=13763)](#)
 
 </div>
