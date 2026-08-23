@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/banner.svg?v=1" alt="Souvlatzidiko Unlocker">
+<img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/banner.svg?v=980" alt="Souvlatzidiko Unlocker">
 
 [![React 18](https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/badge-react.svg?v=1)](#)
 [![TypeScript](https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/badge-ts.svg?v=1)](#)
@@ -86,28 +86,9 @@ Optional login to enable automatic status management:
 
 ## <img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/icon-gamepad.svg?v=1" width="24" align="middle"> Project Structure
 
-```
-src/
-├── main/
-│   ├── index.ts            # App entry, window, tray, splash flow
-│   ├── updater.ts          # Auto-updater + splash preload
-│   ├── store.ts            # electron-store schema
-│   ├── trayIcons.ts        # Base64 tray icon assets
-│   ├── steam/
-│   │   ├── client.ts       # steamworks.js wrapper + games cache
-│   │   ├── idleManager.ts  # Multi-game idle process manager
-│   │   ├── worker.ts       # Child process: steamworks idle worker
-│   │   ├── steamPaths.ts   # Steam install path & VDF helpers
-│   │   └── steamUser.ts    # Account manager (QR/cookie login, invisible mode)
-│   └── ipc/handlers.ts     # All IPC channel registrations
-├── preload/index.ts        # Secure contextBridge API
-├── renderer/
-│   ├── components/         # TitleBar, Sidebar, UpdateBanner, GameImage, SetupScreen
-│   ├── pages/              # Home, Games, Achievements, Settings, Idle, AutoIdle, Portfolio
-│   ├── hooks/              # useAppContext, useTheme, useUpdater
-│   └── styles/global.css
-└── shared/types.ts         # Shared types, IPC channels & default settings
-```
+<div align="center">
+  <img src="https://raw.githubusercontent.com/thomasthanos/steam-idler/assets/.github/assets/tree.svg?v=980" width="100%" alt="Project Structure">
+</div>
 
 <br>
 
